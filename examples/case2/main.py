@@ -9,40 +9,55 @@ import error
 def vector_source(sd):
     x = sd.face_centers[0, :]
     y = sd.face_centers[1, :]
+    z = sd.face_centers[2, :]
 
-    first = 24*x**4*y - 12*x**4 - 48*x**3*y + 24*x**3 + 48*x**2*y**3 - 72*x**2*y**2 + 48*x**2*y - 12*x**2 - 48*x*y**3 + 74*x*y**2 - 26*x*y + 8*y**3 - 13*y**2 + 5*y
+    first = y*z*(1 - 2*x)*(y - 1)*(z - 1)
+    second = 4*x*y**2*z**2*(x - 1)*(z - 1) + 12*x*y**2*z*(x - 1)*(y - 1)**2 + 4*x*y**2*z*(x - 1)*(z - 1)**2 + 12*x*y**2*(x - 1)*(y - 1)**2*(z - 1) + 16*x*y*z**2*(x - 1)*(y - 1)*(z - 1) + 16*x*y*z*(x - 1)*(y - 1)*(z - 1)**2 - x*y*z*(x - 1)*(z - 1) + 4*x*z**2*(x - 1)*(y - 1)**2*(z - 1) + 4*x*z*(x - 1)*(y - 1)**2*(z - 1)**2 - x*z*(x - 1)*(y - 1)*(z - 1) + 4*y**2*z**2*(y - 1)**2*(z - 1) + 4*y**2*z*(y - 1)**2*(z - 1)**2
+    third = -4*x*y**2*z**2*(x - 1)*(y - 1) - 16*x*y**2*z*(x - 1)*(y - 1)*(z - 1) - 4*x*y**2*(x - 1)*(y - 1)*(z - 1)**2 - 4*x*y*z**2*(x - 1)*(y - 1)**2 - 12*x*y*z**2*(x - 1)*(z - 1)**2 - 16*x*y*z*(x - 1)*(y - 1)**2*(z - 1) - x*y*z*(x - 1)*(y - 1) - 4*x*y*(x - 1)*(y - 1)**2*(z - 1)**2 - x*y*(x - 1)*(y - 1)*(z - 1) - 12*x*z**2*(x - 1)*(y - 1)*(z - 1)**2 - 4*y**2*z**2*(y - 1)*(z - 1)**2 - 4*y*z**2*(y - 1)**2*(z - 1)**2
 
-    second = -48*x**3*y**2 + 48*x**3*y - 8*x**3 + 72*x**2*y**2 - 70*x**2*y + 11*x**2 - 24*x*y**4 + 48*x*y**3 - 48*x*y**2 + 22*x*y - 3*x + 12*y**4 - 24*y**3 + 12*y**2
-
-    source = np.vstack((first, second, np.zeros(sd.num_faces)))
+    source = np.vstack((first, second, third))
     return np.sum(sd.face_normals * source, axis=0)
 
 def scalar_source(sd):
     x = sd.cell_centers[0, :]
     y = sd.cell_centers[1, :]
-    return  x*y*(1 - x)*(1 - y)
+    z = sd.cell_centers[2, :]
+
+    return x*y*z*(1 - x)*(1 - y)*(1 - z)
 
 def r_ex(sd):
-    x = sd.nodes[0, :]
-    y = sd.nodes[1, :]
-    return 12*x**2*y**2*(x - 1)**2 + 12*x**2*y**2*(y - 1)**2 - 12*x**2*y*(x - 1)**2 + 2*x**2*(x - 1)**2 - 12*x*y**2*(y - 1)**2 + 2*y**2*(y - 1)**2
+    x = sd.cell_centers[0, :]
+    y = sd.cell_centers[1, :]
+    z = sd.cell_centers[2, :]
+
+    first = 2*x*(x - 1)*(y**2*z**2*(y - 1)**2 + y**2*z**2*(z - 1)**2 + 4*y**2*z*(y - 1)**2*(z - 1) + y**2*(y - 1)**2*(z - 1)**2 + 4*y*z**2*(y - 1)*(z - 1)**2 + z**2*(y - 1)**2*(z - 1)**2)
+    second = -2*y*z**2*(y - 1)*(z - 1)**2*(x*y + x*(y - 1) + y*(x - 1) + (x - 1)*(y - 1))
+    third = -2*y**2*z*(y - 1)**2*(z - 1)*(x*z + x*(z - 1) + z*(x - 1) + (x - 1)*(z - 1))
+
+    return np.vstack((first, second, third))
 
 def u_ex(sd):
     x = sd.cell_centers[0, :]
     y = sd.cell_centers[1, :]
-    first = -2 * x * y * (x - 1) * (y - 1) * x * (x - 1) * (2 * y - 1)
-    second = 2 * x * y * (x - 1) * (y - 1) * y * (y - 1) * (2 * x - 1)
-    return np.vstack((first, second, np.zeros(sd.num_cells)))
+    z = sd.cell_centers[2, :]
+
+    first = np.zeros(sd.num_cells)
+    second = x*y**2*z**2*(1 - x)*(1 - y)**2*(2*z - 2) + 2*x*y**2*z*(1 - x)*(1 - y)**2*(1 - z)**2
+    third = -x*y**2*z**2*(1 - x)*(1 - z)**2*(2*y - 2) - 2*x*y*z**2*(1 - x)*(1 - y)**2*(1 - z)**2
+
+    return np.vstack((first, second, third))
 
 def p_ex(sd):
     x = sd.nodes[0, :]
     y = sd.nodes[1, :]
-    return  x*y*(1 - x)*(1 - y)
+    z = sd.nodes[2, :]
+
+    return x*y*z*(1 - x)*(1 - y)*(1 - z)
 
 def create_grid(n):
     # make the grid
     domain = {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1}
-    network = pp.FractureNetwork2d(domain=domain)
+    network = pp.FractureNetwork3d(domain=domain)
 
     mesh_size = 1/n
     mesh_kwargs = {"mesh_size_frac": mesh_size, "mesh_size_min": mesh_size}
@@ -111,8 +126,8 @@ def main(mdg, keyword="flow"):
     r, u, p = x[:dof_r], x[dof_r:dof_r+dof_u], x[-dof_p:]
 
     # post process rotation
-    proj_r = pg.eval_at_cell_centers(mdg, pg.Lagrange(keyword))
-    P0r = proj_r * r
+    proj_r = pg.eval_at_cell_centers(mdg, pg.Nedelec0(keyword))
+    P0r = (proj_r * r).reshape((3, -1), order="F")
 
     # post process displacement
     proj_u = pg.proj_faces_to_cells(mdg)
@@ -125,10 +140,10 @@ def main(mdg, keyword="flow"):
     #save.write_vtu(["P0r", "P0u", "p"])
 
     # compute the error
-    return error.compute(sd, r, r_ex, P0u, u_ex, p, p_ex)
+    return error.compute(sd, P0r, r_ex, P0u, u_ex, p, p_ex)
 
 if __name__ == "__main__":
 
-    N = 2 ** np.arange(4, 9)
+    N = np.arange(9, 12) #14
     err = np.array([main(create_grid(n)) for n in N])
     error.order(err)
