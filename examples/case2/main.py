@@ -123,7 +123,7 @@ def main(mdg, keyword="flow"):
     x = ls.solve()
 
     # extract the variables
-    r, u, p = x[:dof_r], x[dof_r:dof_r+dof_u], x[-dof_p:]
+    r, u, p = np.split(x, np.cumsum([dof_r, dof_u]))
 
     # post process rotation
     proj_r = pg.eval_at_cell_centers(mdg, pg.Nedelec0(keyword))
