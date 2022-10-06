@@ -49,7 +49,7 @@ def main(mdg, keyword="flow"):
     mu, labda = 1, 1
 
     # set the data
-    bc_val, bc_ess, v_source = [], [], []
+    bc_val, ess_faces, ess_ridges, v_source = [], [], [], []
     for sd, data in mdg.subdomains(return_data=True):
         parameters = {
             "second_order_tensor": pp.SecondOrderTensor(np.ones(sd.num_cells))
@@ -57,49 +57,47 @@ def main(mdg, keyword="flow"):
         data[pp.PARAMETERS] = {keyword: parameters}
         data[pp.DISCRETIZATION_MATRICES] = {keyword: {}}
 
-        bc_ridges = np.zeros(sd.num_ridges)
-        bc_faces = np.zeros(sd.num_faces)
-        bc_val.append(np.hstack((bc_ridges, bc_faces)))
+        bc_val.append(np.zeros(sd.num_faces))
 
-        ess_ridges = sd.tags["domain_boundary_nodes"]
-        ess_faces = sd.tags["domain_boundary_faces"]
-        bc_ess.append(np.hstack((ess_ridges, ess_faces)))
+        ess_faces.append(sd.tags["domain_boundary_faces"])
+        ess_ridges.append(sd.tags["domain_boundary_nodes"])
 
         v_source.append(vector_source(sd))
 
-    bc_ess = np.hstack(bc_ess)
+    ess_faces = np.hstack(ess_faces)
+    ess_ridges = np.hstack(ess_ridges)
+
+    # formulation specific data
+    c1 = 2 / mu
+    c2 = labda + mu
 
     # construct the matrices
-    ridge_mass = pg.ridge_mass(mdg)
+    lumped_ridge_mass = pg.numerics.innerproducts.lumped_mass_matrix(mdg, 2, None)
     cell_mass = pg.cell_mass(mdg)
-    face_mass = pg.face_mass(mdg)
 
+    face_mass = pg.face_mass(mdg)
     curl = face_mass * pg.curl(mdg)
     div = pg.div(mdg)
 
     div_div = div.T * sps.linalg.spsolve(cell_mass, div)
 
-    # get the degrees of freedom for each variable
-    face_dof, ridge_dof = curl.shape
-    dofs = np.cumsum([ridge_dof])
-
     # assemble the problem
-    mat = sps.bmat([[2/mu*ridge_mass,            -curl.T],
-                    [           curl, (labda + mu)*div_div]], format="csc")
+    ls = pg.LinearSystem(c1*lumped_ridge_mass, curl.T.tocsc())
+    ls.flag_ess_bc(ess_ridges, np.zeros(ess_ridges.size))
+    A = ls.solve()
+
+    mat = curl * A + c2*div_div
 
     # assemble the right-hand side
-    rhs = np.hstack(bc_val)
-    rhs[dofs[0]:] += face_mass * np.hstack(v_source)
+    rhs = face_mass * np.hstack(v_source)
 
     # solve the problem
     ls = pg.LinearSystem(mat, rhs)
-    ls.flag_ess_bc(bc_ess, np.zeros(bc_ess.size))
-    x = ls.solve()
-
-    # extract the variables
-    r, u = np.split(x, dofs)
+    ls.flag_ess_bc(ess_faces, np.zeros(ess_faces.size))
+    u = ls.solve()
 
     # post process rotation
+    r = A * u
     proj_r = pg.eval_at_cell_centers(mdg, pg.Lagrange(keyword))
     P0r = proj_r * r
 

@@ -15,7 +15,7 @@ def ridge(sd, r, r_ex):
             np.trace(((r_ex(sd) - r) @ sps.diags(sd.cell_volumes) @ (r_ex(sd) - r).T))
         ) / norm_r
     else:
-        mass = pg.Lagrange("flow").assemble_mass_matrix(sd, None)
+        mass = pg.Lagrange1("flow").assemble_mass_matrix(sd, None)
         norm_r = np.sqrt(r_ex(sd) @ mass @ r_ex(sd).T)
         err_r = np.sqrt((r_ex(sd) - r) @ mass @ (r_ex(sd) - r).T) / norm_r
     return err_r
@@ -35,7 +35,7 @@ def cell(sd, p, p_ex):
     #err_p = np.sqrt((p_ex(sd) - p) @ sps.diags(sd.cell_volumes) @ (p_ex(sd) - p).T) / norm_p
     norm_p = _cell_error(sd, np.zeros(sd.num_cells), p_ex(sd))
     err_p = _cell_error(sd, p, p_ex(sd)) / norm_p
-    return h, err_p
+    return err_p
 
 def order(err, h):
     return np.log(err[:-1] / err[1:]) / np.log(h[:-1] / h[1:])

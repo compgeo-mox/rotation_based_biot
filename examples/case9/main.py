@@ -16,19 +16,6 @@ def vector_source(sd):
     source = np.vstack((first, second, np.zeros(sd.num_faces)))
     return np.sum(sd.face_normals * source, axis=0)
 
-def r_ex(sd):
-    x = sd.nodes[0, :]
-    y = sd.nodes[1, :]
-    return x*y*(1.0*x*y*(1 - x)*(y - 1)**2 + 4.0*x*y*(1 - y)*(x - 1)**2 - 4.0*x*(x - 1)**2*(y - 1)**2 - 1.0*y*(x - 1)**2*(y - 1)**2)
-
-def u_ex(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
-
-    first = 4*x**2*y**2*(1 - x)**2*(1 - y)**2
-    second = -x**2*y**2*(1 - x)**2*(1 - y)**2
-    return np.vstack((first, second, np.zeros(sd.num_cells)))
-
 def create_grid(n):
     # make the grid
     domain = {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1}
@@ -43,10 +30,21 @@ def create_grid(n):
 
     return mdg
 
-def main(mdg, keyword="flow"):
+class gmres_counter(object):
+    def __init__(self, disp=True):
+        self._disp = disp
+        self.niter = 0
+    def __call__(self, rk=None):
+        self.niter += 1
+        if self._disp:
+            #print('iter %3i\trk = %s' % (self.niter, str(rk)))
+            print('iter %3i' % self.niter)
 
-    # problem data
-    mu, labda = 1, 1
+def main(n, mu, labda):
+    print("Perform simulation for", n, mu, labda)
+
+    mdg = create_grid(n)
+    keyword="flow"
 
     # set the data
     bc_val, bc_ess, v_source = [], [], []
@@ -75,64 +73,56 @@ def main(mdg, keyword="flow"):
     face_mass = pg.face_mass(mdg)
 
     curl = face_mass * pg.curl(mdg)
-    div = pg.div(mdg)
+    div = cell_mass * pg.div(mdg)
 
-    div_div = div.T * sps.linalg.spsolve(cell_mass, div)
+    div_div = pg.div(mdg).T * cell_mass * pg.div(mdg)
 
     # get the degrees of freedom for each variable
     face_dof, ridge_dof = curl.shape
     dofs = np.cumsum([ridge_dof])
 
     # assemble the problem
-    mat = sps.bmat([[2/mu*ridge_mass,            -curl.T],
-                    [           curl, (labda + mu)*div_div]], format="csc")
+    mat = sps.bmat([
+        [2/mu*ridge_mass,                -curl.T],
+        [           -curl, -(labda + mu)*div_div]
+        ], format="csc")
 
     # assemble the right-hand side
     rhs = np.hstack(bc_val)
     rhs[dofs[0]:] += face_mass * np.hstack(v_source)
 
+    L1 = pg.Lagrange1(keyword)
+    RT0 = pg.RT0(keyword)
+
+    p1 = 2/mu*(ridge_mass + L1.assemble_stiff_matrix(sd, data))
+    p2 = mu/2*face_mass + (labda + mu) * RT0.assemble_stiff_matrix(sd, data)
+
+    precond = sps.block_diag([p1, p2], format="csc")
+
+    ls_precond = pg.LinearSystem(precond)
+    ls_precond.flag_ess_bc(bc_ess, np.zeros(bc_ess.size))
+    precond_0, _, _ = ls_precond.reduce_system()
+    apply_precond = lambda x: sps.linalg.spsolve(precond_0, x)
+    M = sps.linalg.LinearOperator(precond_0.shape, matvec=apply_precond)
+
+    counter = gmres_counter()
+    solver = lambda A, b: sps.linalg.minres(A, b, M=M, callback=counter)[0]
+
     # solve the problem
     ls = pg.LinearSystem(mat, rhs)
     ls.flag_ess_bc(bc_ess, np.zeros(bc_ess.size))
-    x = ls.solve()
+    x = ls.solve(solver=solver)
 
-    # extract the variables
-    r, u = np.split(x, dofs)
-
-    # post process rotation
-    proj_r = pg.eval_at_cell_centers(mdg, pg.Lagrange(keyword))
-    P0r = proj_r * r
-
-    # post process displacement
-    proj_u = pg.proj_faces_to_cells(mdg)
-    P0u = (proj_u * u).reshape((3, -1), order="F")
-
-    #for _, data in mdg.subdomains(return_data=True):
-    #   data[pp.STATE] = {"P0r": P0r, "P0u": P0u}
-
-    #save = pp.Exporter(mdg, "sol")
-    #save.write_vtu(["P0r", "P0u"])
-
-    # compute the error
-    h, *_ = error.geometry_info(sd)
-
-    err_r = error.ridge(sd, r, r_ex)
-    err_q = error.face(sd, P0u, u_ex)
-
-    return h, err_r, err_q
+    return counter.niter
 
 if __name__ == "__main__":
 
-    N = 2 ** np.arange(4, 9)
-    err = np.array([main(create_grid(n)) for n in N])
+    n_val = 2 ** np.arange(4, 8) # 9
 
-    order_r = error.order(err[:, 1], err[:, 0])
-    order_u = error.order(err[:, 2], err[:, 0])
+    mu_val = np.power(10., np.arange(-4, 5))
+    labda_val = np.power(10., np.arange(-4, 5))
 
-    print("h\n", err[:, 0])
+    iters = np.array([(n, mu, labda, main(n, mu, labda))
+                        for n in n_val for mu in mu_val for labda in labda_val])
 
-    print("err_r\n", err[:, 1])
-    print("order_r\n", order_r)
-
-    print("err_u\n", err[:, 2])
-    print("order_u\n", order_u)
+    np.savetxt("iterations.txt", iters)
