@@ -32,7 +32,7 @@ def create_grid(n):
 
     return mdg
 
-class gmres_counter(object):
+class minres_counter(object):
     def __init__(self, disp=True):
         self._disp = disp
         self.niter = 0
@@ -107,7 +107,7 @@ def main(n, mu, labda):
     apply_precond = lambda x: sps.linalg.spsolve(precond_0, x)
     M = sps.linalg.LinearOperator(precond_0.shape, matvec=apply_precond)
 
-    counter = gmres_counter()
+    counter = minres_counter()
     solver = lambda A, b: sps.linalg.minres(A, b, M=M, callback=counter)[0]
 
     # solve the problem
@@ -115,16 +115,23 @@ def main(n, mu, labda):
     ls.flag_ess_bc(bc_ess, np.zeros(bc_ess.size))
     x = ls.solve(solver=solver)
 
-    return counter.niter
+    A_0, _, _ = ls.reduce_system()
+    l_M = sps.linalg.eigsh(A_0, k=1, M=precond_0, which="LM", return_eigenvectors=False, tol=1e-4)
+    l_m = sps.linalg.eigsh(A_0, k=1, M=precond_0, which="SM", return_eigenvectors=False, tol=1e-4)
+
+    print(l_M, l_m, l_M/l_m)
+    return counter.niter, l_M, l_m
 
 if __name__ == "__main__":
 
     n_val = np.arange(9, 14)
-
     mu_val = np.power(10., np.arange(-4, 5))
     labda_val = np.power(10., np.arange(-4, 5))
 
-    iters = np.array([(n, mu, labda, main(n, mu, labda))
-                        for n in n_val for mu in mu_val for labda in labda_val])
+    results = np.array([(n, mu, labda,
+                         main(n, mu, labda))
+                           for n in n_val \
+                           for mu in mu_val \
+                           for labda in labda_val])
 
-    np.savetxt("iterations.txt", iters)
+    np.savetxt("iterations.txt", results)
