@@ -61,7 +61,7 @@ def main(n, keyword="flow"):
     mu, labda = 1, 1
 
     # set the data
-    bc_val, ess_faces, ess_ridges, v_source = [], [], [], []
+    bc_val, bc_ess, v_source = [], [], []
     for sd, data in mdg.subdomains(return_data=True):
         parameters = {
             "second_order_tensor": pp.SecondOrderTensor(np.ones(sd.num_cells))
@@ -69,51 +69,56 @@ def main(n, keyword="flow"):
         data[pp.PARAMETERS] = {keyword: parameters}
         data[pp.DISCRETIZATION_MATRICES] = {keyword: {}}
 
-        bc_val.append(np.zeros(sd.num_faces))
+        bc_ridges = np.zeros(sd.num_ridges)
+        bc_faces = np.zeros(sd.num_faces)
+        bc_val.append(np.hstack((bc_ridges, bc_faces)))
 
-        ess_faces.append(sd.tags["domain_boundary_faces"])
-        ess_ridges.append(sd.tags["domain_boundary_ridges"])
-        ess_ridges.append(sd.tags["domain_boundary_ridges"])
+        ess_ridges = sd.tags["domain_boundary_ridges"]
+        ess_faces = sd.tags["domain_boundary_faces"]
+        bc_ess.append(np.hstack((ess_ridges, ess_faces)))
 
         v_source.append(vector_source(sd))
 
-    ess_faces = np.hstack(ess_faces)
-    ess_ridges = np.hstack(ess_ridges)
+    bc_ess = np.hstack(bc_ess)
 
-    # construct the matrices
-    NE1 = pg.Nedelec1(keyword)
+    # dscretization
+    N0 = pg.Nedelec0(keyword)
     RT0 = pg.RT0(keyword)
 
-    lumped_ridge_mass = pg.numerics.innerproducts.lumped_mass_matrix(mdg, 2, NE1)
+    # construct the matrices
+    ridge_mass = pg.ridge_mass(mdg)
     cell_mass = pg.cell_mass(mdg)
     face_mass = pg.face_mass(mdg)
 
-    curl_ne = sps.bmat([[NE1.assemble_diff_matrix(sd) for sd in mdg.subdomains()]])
-    curl = face_mass * curl_ne
+    curl = face_mass * pg.curl(mdg)
     div = cell_mass * pg.div(mdg)
     div_div = pg.div(mdg).T * cell_mass * pg.div(mdg)
 
-    # assemble the problem
-    ls = pg.LinearSystem(2/mu*lumped_ridge_mass, curl.T.tocsc())
-    ls.flag_ess_bc(ess_ridges, np.zeros(ess_ridges.size))
-    A = ls.solve()
+    # get the degrees of freedom for each variable
+    face_dof, ridge_dof = curl.shape
+    dofs = np.cumsum([ridge_dof])
 
-    mat = curl * A + (labda + mu)*div_div
+    # assemble the problem
+    mat = sps.bmat([[2/mu*ridge_mass,            -curl.T],
+                    [           curl, (labda + mu)*div_div]], format="csc")
 
     # assemble the right-hand side
-    rhs = face_mass * np.hstack(v_source)
+    rhs = np.hstack(bc_val)
+    rhs[dofs[0]:] += face_mass * np.hstack(v_source)
 
     # solve the problem
     ls = pg.LinearSystem(mat, rhs)
-    ls.flag_ess_bc(ess_faces, np.zeros(ess_faces.size))
-    u = ls.solve()
+    ls.flag_ess_bc(bc_ess, np.zeros(bc_ess.size))
+    x = ls.solve()
+
+    # extract the variables
+    r, u = np.split(x, dofs)
 
     # projection matices
-    ridge_proj = pg.eval_at_cell_centers(mdg, NE1)
+    ridge_proj = pg.eval_at_cell_centers(mdg, N0)
     face_proj = pg.eval_at_cell_centers(mdg, RT0)
 
     # post process rotation
-    r = A * u
     cell_r = (ridge_proj * r).reshape((3, -1), order="F")
 
     # post process displacement
@@ -125,7 +130,7 @@ def main(n, keyword="flow"):
     err_r = error.ridge(sd, cell_r, r_ex)
     err_u = error.face(sd, cell_u, u_ex)
 
-    curl_r = curl_ne * r
+    curl_r = pg.curl(mdg) * r
     div_u = pg.div(mdg) * u
 
     # save some of the info to file
