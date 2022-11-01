@@ -119,8 +119,10 @@ def main(mdg):
     cell_mass = pg.cell_mass(mdg)
     face_mass = pg.face_mass(mdg, keyword=elast_key)
     # TODO: Add permeability
-    BDM1 = pg.BDM1(flow_key)
+    L1 = pg.Lagrange1(elast_key)
+    RT0 = pg.RT0(elast_key)
     P0 = pg.PwConstants(flow_key)
+    BDM1 = pg.BDM1(flow_key)
 
     face_mass_bdm1 = BDM1.assemble_mass_matrix(sd, None)
     lumped_face_perm_mass = BDM1.assemble_lumped_matrix(sd, None)
@@ -148,9 +150,10 @@ def main(mdg):
     flow_mat = delta * div_bdm1 * flow_sc + c0 * cell_mass
 
     # assemble the vector source for the flow problem
-    ls = pg.LinearSystem(lumped_face_perm_mass, face_mass_bdm1 * np.hstack(flow_v_source))
+    flow_v_source = np.hstack(flow_v_source)
+    ls = pg.LinearSystem(lumped_face_perm_mass, face_mass_bdm1 * flow_v_source)
     ls.flag_ess_bc(ess_faces, np.zeros(ess_faces.size))
-    flow_v_source = - delta * div_bdm1 * ls.solve()
+    flow_v_source_sc = ls.solve()
 
     # get the degrees of freedom for each variable
     _, face_dof = div.shape
@@ -167,11 +170,7 @@ def main(mdg):
     # data from the elastic problem
     rhs[:dofs[0]] += face_mass * np.hstack(elast_v_source)
     # data from the flow problem
-    rhs[dofs[0]:] += flow_v_source + np.hstack(flow_s_source)
-
-    # projection matrices
-    ridge_proj = pg.eval_at_cell_centers(mdg, pg.Lagrange1(elast_key))
-    face_proj = pg.proj_faces_to_cells(mdg)
+    rhs[dofs[0]:] += - delta * div_bdm1 * flow_v_source_sc + np.hstack(flow_s_source)
 
     # solve the problem
     ls = pg.LinearSystem(spp, rhs)
@@ -180,6 +179,12 @@ def main(mdg):
     # extract the variables
     u, p = np.split(x, dofs)
 
+    # projection matrices
+    ridge_proj = pg.eval_at_cell_centers(mdg, L1)
+    face_proj = pg.eval_at_cell_centers(mdg, RT0)
+    face_proj_bdm1 = pg.eval_at_cell_centers(mdg, BDM1)
+    cell_proj = pg.eval_at_cell_centers(mdg, P0)
+
     # post process rotation
     r = elast_sc * u
     cell_r = ridge_proj * r
@@ -187,39 +192,33 @@ def main(mdg):
     # post process displacement
     cell_u = (face_proj * u).reshape((3, -1), order="F")
 
-    cell_p = P0.eval_at_cell_centers(sd) * p
-
     # post process Darcy velocity
-    #cell_q = (face_proj * q).reshape((3, -1), order="F")
+    q = flow_sc * p + flow_v_source_sc
+    cell_q = (face_proj_bdm1 * q).reshape((3, -1), order="F")
 
-    for sd, data in mdg.subdomains(return_data=True):
-       #data[pp.STATE] = {"cell_r": cell_r, "cell_u": cell_u, "cell_q": cell_q, "p": p}
-       data[pp.STATE] = {"cell_r": cell_r, "cell_u": cell_u, "cell_p": cell_p}
-
-    save = pp.Exporter(mdg, "sol", folder_name="sol")
-    save.write_vtu(["cell_r", "cell_u", "cell_p"])
-    #save.write_vtu(["cell_r", "cell_u", "cell_q", "p"])
+    # post process Darcy pressure
+    cell_p = cell_proj * p
 
     # compute the error
     h, *_ = error.geometry_info(sd)
 
     err_r = error.ridge(sd, r, r_ex)
     err_u = error.face(sd, cell_u, u_ex)
-    #err_q = error.face(sd, cell_q, q_ex)
-    err_p = error.cell(sd, cell_p, p_ex)
+    err_q = error.face(sd, cell_q, q_ex)
+    err_p = error.cell(sd, p, p_ex)
 
-    return h, err_r, err_u, err_p
-    #return h, err_r, err_u, err_q, err_p
+    import pdb; pdb.set_trace()
+    return h, err_r, err_u, err_q, err_p
 
 if __name__ == "__main__":
 
-    N = 2 ** np.arange(4, 9) #9
+    N = 2 ** np.arange(4, 9)
     err = np.array([main(create_grid(n)) for n in N])
 
     order_r = error.order(err[:, 1], err[:, 0])
     order_u = error.order(err[:, 2], err[:, 0])
-    #order_q = error.order(err[:, 3], err[:, 0])
-    order_p = error.order(err[:, 3], err[:, 0])
+    order_q = error.order(err[:, 3], err[:, 0])
+    order_p = error.order(err[:, 4], err[:, 0])
 
     print("h\n", err[:, 0])
 
@@ -229,8 +228,8 @@ if __name__ == "__main__":
     print("err_u\n", err[:, 2])
     print("order_u\n", order_u)
 
-    #print("err_q\n", err[:, 3])
-    #print("order_q\n", order_u)
+    print("err_q\n", err[:, 3])
+    print("order_q\n", order_q)
 
-    print("err_p\n", err[:, 3])
+    print("err_p\n", err[:, 4])
     print("order_p\n", order_p)

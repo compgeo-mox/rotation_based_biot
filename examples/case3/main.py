@@ -69,7 +69,8 @@ def create_grid(n):
 
     return mdg
 
-def main(mdg):
+def main(n):
+    mdg = create_grid(n)
 
     elast_key = "elasticity"
     flow_key = "flow"
@@ -116,6 +117,11 @@ def main(mdg):
 
     bc_ess = np.hstack(elast_bc_ess + flow_bc_ess)
 
+    # dscretization
+    L1 = pg.Lagrange1(elast_key)
+    RT0 = pg.RT0(flow_key)
+    P0 = pg.PwConstants(flow_key)
+
     # construct the matrices
     ridge_mass = pg.ridge_mass(mdg)
     cell_mass = pg.cell_mass(mdg)
@@ -123,9 +129,8 @@ def main(mdg):
     face_perm_mass = pg.face_mass(mdg, keyword=flow_key)
 
     curl = face_mass * pg.curl(mdg)
-    div = pg.div(mdg)
-
-    div_div = div.T * sps.linalg.spsolve(cell_mass, div)
+    div = cell_mass * pg.div(mdg)
+    div_div = pg.div(mdg).T * cell_mass * pg.div(mdg)
 
     # get the degrees of freedom for each variable
     _, ridge_dof = curl.shape
@@ -148,11 +153,12 @@ def main(mdg):
     # data from the flow problem
     rhs[dofs[1]:] += np.hstack(flow_bc_val)
     rhs[dofs[1]:dofs[2]] += face_mass * np.hstack(flow_v_source)
-    rhs[dofs[2]:] += cell_mass * np.hstack(flow_s_source)
+    rhs[dofs[2]:] += np.hstack(flow_s_source)
 
     # projection matrices
-    ridge_proj = pg.eval_at_cell_centers(mdg, pg.Lagrange(elast_key))
-    face_proj = pg.proj_faces_to_cells(mdg)
+    ridge_proj = pg.eval_at_cell_centers(mdg, L1)
+    face_proj = pg.eval_at_cell_centers(mdg, RT0)
+    cell_proj = pg.eval_at_cell_centers(mdg, P0)
 
     # solve the problem
     ls = pg.LinearSystem(spp, rhs)
@@ -171,11 +177,8 @@ def main(mdg):
     # post process Darcy velocity
     cell_q = (face_proj * q).reshape((3, -1), order="F")
 
-    for sd, data in mdg.subdomains(return_data=True):
-       data[pp.STATE] = {"cell_r": cell_r, "cell_u": cell_u, "cell_q": cell_q, "p": p}
-
-    save = pp.Exporter(mdg, "sol", folder_name="sol")
-    save.write_vtu(["cell_r", "cell_u", "cell_q", "p"])
+    # post process Darcy pressure
+    cell_p = cell_proj * p
 
     # compute the error
     h, *_ = error.geometry_info(sd)
@@ -185,12 +188,26 @@ def main(mdg):
     err_q = error.face(sd, cell_q, q_ex)
     err_p = error.cell(sd, p, p_ex)
 
+    curl_r = pg.curl(mdg) * r
+    div_u = pg.div(mdg) * u
+    div_q = pg.div(mdg) * q
+
+    # save some of the info to file
+    np.savetxt("curl_r_" + str(n), curl_r)
+    np.savetxt("div_u_" + str(n), div_u)
+    np.savetxt("div_q_" + str(n), div_q)
+    np.savetxt("r_" + str(n), r)
+    np.savetxt("u_" + str(n), u)
+    np.savetxt("q_" + str(n), q)
+    np.savetxt("p_" + str(n), p)
+
     return h, err_r, err_u, err_q, err_p
 
 if __name__ == "__main__":
 
     N = 2 ** np.arange(4, 9)
-    err = np.array([main(create_grid(n)) for n in N])
+
+    err = np.array([main(n) for n in N])
 
     order_r = error.order(err[:, 1], err[:, 0])
     order_u = error.order(err[:, 2], err[:, 0])

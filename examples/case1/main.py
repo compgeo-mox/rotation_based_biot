@@ -43,7 +43,8 @@ def create_grid(n):
 
     return mdg
 
-def main(mdg, keyword="flow"):
+def main(n, keyword="flow"):
+    mdg = create_grid(n)
 
     # problem data
     mu, labda = 1, 1
@@ -69,15 +70,18 @@ def main(mdg, keyword="flow"):
 
     bc_ess = np.hstack(bc_ess)
 
+    # dscretization
+    L1 = pg.Lagrange1(keyword)
+    RT0 = pg.RT0(keyword)
+
     # construct the matrices
     ridge_mass = pg.ridge_mass(mdg)
     cell_mass = pg.cell_mass(mdg)
     face_mass = pg.face_mass(mdg)
 
     curl = face_mass * pg.curl(mdg)
-    div = pg.div(mdg)
-
-    div_div = div.T * sps.linalg.spsolve(cell_mass, div)
+    div = cell_mass * pg.div(mdg)
+    div_div = pg.div(mdg).T * cell_mass * pg.div(mdg)
 
     # get the degrees of freedom for each variable
     face_dof, ridge_dof = curl.shape
@@ -99,32 +103,37 @@ def main(mdg, keyword="flow"):
     # extract the variables
     r, u = np.split(x, dofs)
 
+    # projection matices
+    ridge_proj = pg.eval_at_cell_centers(mdg, L1)
+    face_proj = pg.eval_at_cell_centers(mdg, RT0)
+
     # post process rotation
-    proj_r = pg.eval_at_cell_centers(mdg, pg.Lagrange(keyword))
-    P0r = proj_r * r
+    cell_r = ridge_proj * r
 
     # post process displacement
-    proj_u = pg.proj_faces_to_cells(mdg)
-    P0u = (proj_u * u).reshape((3, -1), order="F")
-
-    #for _, data in mdg.subdomains(return_data=True):
-    #   data[pp.STATE] = {"P0r": P0r, "P0u": P0u}
-
-    #save = pp.Exporter(mdg, "sol")
-    #save.write_vtu(["P0r", "P0u"])
+    cell_u = (face_proj * u).reshape((3, -1), order="F")
 
     # compute the error
     h, *_ = error.geometry_info(sd)
 
     err_r = error.ridge(sd, r, r_ex)
-    err_q = error.face(sd, P0u, u_ex)
+    err_u = error.face(sd, cell_u, u_ex)
 
-    return h, err_r, err_q
+    curl_r = pg.curl(mdg) * r
+    div_u = pg.div(mdg) * u
+
+    # save some of the info to file
+    np.savetxt("curl_r_" + str(n), curl_r)
+    np.savetxt("div_u_" + str(n), div_u)
+    np.savetxt("r_" + str(n), r)
+    np.savetxt("u_" + str(n), u)
+
+    return h, err_r, err_u
 
 if __name__ == "__main__":
 
     N = 2 ** np.arange(4, 9)
-    err = np.array([main(create_grid(n)) for n in N])
+    err = np.array([main(n) for n in N])
 
     order_r = error.order(err[:, 1], err[:, 0])
     order_u = error.order(err[:, 2], err[:, 0])
