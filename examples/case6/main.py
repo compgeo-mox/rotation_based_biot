@@ -80,16 +80,17 @@ def main(mdg, keyword="flow"):
     ess_ridges = np.hstack(ess_ridges)
 
     # construct the matrices
-    discr_ne1 = pg.Nedelec1(keyword)
-    lumped_ridge_mass = pg.numerics.innerproducts.lumped_mass_matrix(mdg, 2, discr_ne1)
-    curl_ne = sps.bmat([[discr_ne1.assemble_curl(sd) for sd in mdg.subdomains()]])
+    NE1 = pg.Nedelec1(keyword)
+    RT0 = pg.RT0(keyword)
 
+    lumped_ridge_mass = pg.numerics.innerproducts.lumped_mass_matrix(mdg, 2, NE1)
     cell_mass = pg.cell_mass(mdg)
     face_mass = pg.face_mass(mdg)
-    curl = face_mass * curl_ne
-    div = pg.div(mdg)
 
-    div_div = div.T * sps.linalg.spsolve(cell_mass, div)
+    curl_ne = sps.bmat([[NE1.assemble_diff_matrix(sd) for sd in mdg.subdomains()]])
+    curl = face_mass * curl_ne
+    div = cell_mass * pg.div(mdg)
+    div_div = pg.div(mdg).T * cell_mass * pg.div(mdg)
 
     # assemble the problem
     ls = pg.LinearSystem(2/mu*lumped_ridge_mass, curl.T.tocsc())
@@ -106,20 +107,16 @@ def main(mdg, keyword="flow"):
     ls.flag_ess_bc(ess_faces, np.zeros(ess_faces.size))
     u = ls.solve()
 
+    # projection matices
+    ridge_proj = pg.eval_at_cell_centers(mdg, NE1)
+    face_proj = pg.eval_at_cell_centers(mdg, RT0)
+
     # post process rotation
     r = A * u
-    proj_r = pg.eval_at_cell_centers(mdg, discr_ne1)
-    P0r = (proj_r * r).reshape((3, -1), order="F")
+    cell_r = (ridge_proj * r).reshape((3, -1), order="F")
 
     # post process displacement
-    proj_u = pg.proj_faces_to_cells(mdg)
-    P0u = (proj_u * u).reshape((3, -1), order="F")
-
-    #for _, data in mdg.subdomains(return_data=True):
-    #   data[pp.STATE] = {"P0r": P0r, "P0u": P0u}
-
-    #save = pp.Exporter(mdg, "sol")
-    #save.write_vtu(["P0r", "P0u"])
+    cell_u = (face_proj * u).reshape((3, -1), order="F")
 
     # compute the error
     h, *_ = error.geometry_info(sd)

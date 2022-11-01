@@ -205,9 +205,21 @@ def main(mdg):
     err_r = error.ridge(sd, r, r_ex)
     err_u = error.face(sd, cell_u, u_ex)
     err_q = error.face(sd, cell_q, q_ex)
-    err_p = error.cell(sd, p, p_ex)
+    err_p = error.cell(sd, cell_p, p_ex)
 
-    import pdb; pdb.set_trace()
+    curl_r = pg.curl(mdg) * r
+    div_u = pg.div(mdg) * u
+    div_q = BDM1.assemble_diff_matrix(sd) * q
+
+    # save some of the info to file
+    np.savetxt("curl_r_" + str(n), curl_r)
+    np.savetxt("div_u_" + str(n), div_u)
+    np.savetxt("div_q_" + str(n), div_q)
+    np.savetxt("r_" + str(n), r)
+    np.savetxt("u_" + str(n), u)
+    np.savetxt("q_" + str(n), q)
+    np.savetxt("p_" + str(n), p)
+
     return h, err_r, err_u, err_q, err_p
 
 if __name__ == "__main__":

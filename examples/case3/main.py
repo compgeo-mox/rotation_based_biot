@@ -186,7 +186,7 @@ def main(n):
     err_r = error.ridge(sd, r, r_ex)
     err_u = error.face(sd, cell_u, u_ex)
     err_q = error.face(sd, cell_q, q_ex)
-    err_p = error.cell(sd, p, p_ex)
+    err_p = error.cell(sd, cell_p, p_ex)
 
     curl_r = pg.curl(mdg) * r
     div_u = pg.div(mdg) * u
