@@ -69,7 +69,8 @@ def create_grid(n):
 
     return mdg
 
-def main(mdg):
+def main(n):
+    mdg = create_grid(n)
 
     elast_key = "elasticity"
     flow_key = "flow"
@@ -225,7 +226,7 @@ def main(mdg):
 if __name__ == "__main__":
 
     N = 2 ** np.arange(4, 9)
-    err = np.array([main(create_grid(n)) for n in N])
+    err = np.array([main(n) for n in N])
 
     order_r = error.order(err[:, 1], err[:, 0])
     order_u = error.order(err[:, 2], err[:, 0])

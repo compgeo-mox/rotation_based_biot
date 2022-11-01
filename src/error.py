@@ -6,38 +6,64 @@ import pygeon as pg
 def geometry_info(sd):
     return np.mean(sd.cell_diameters()), sd.num_cells, sd.num_faces, sd.num_ridges
 
-def ridge(sd, r, r_ex):
+def ridge(sd, r, r_ex=None, r_hat=None):
+    if r_ex is not None:
+        r_eval = r_ex(sd)
+    if r_hat is not None:
+        r_eval = r_hat
+
     if sd.dim == 3:
         norm_r = np.sqrt(
-            np.trace((r_ex(sd) @ sps.diags(sd.cell_volumes) @ r_ex(sd).T))
+            np.trace((r_eval @ sps.diags(sd.cell_volumes) @ r_eval.T))
         )
         err_r = np.sqrt(
-            np.trace(((r_ex(sd) - r) @ sps.diags(sd.cell_volumes) @ (r_ex(sd) - r).T))
+            np.trace(((r_eval - r) @ sps.diags(sd.cell_volumes) @ (r_eval - r).T))
         ) / norm_r
     else:
         mass = pg.Lagrange1("flow").assemble_mass_matrix(sd, None)
-        norm_r = np.sqrt(r_ex(sd) @ mass @ r_ex(sd).T)
-        err_r = np.sqrt((r_ex(sd) - r) @ mass @ (r_ex(sd) - r).T) / norm_r
+        norm_r = np.sqrt(r_eval @ mass @ r_eval.T)
+        err_r = np.sqrt((r_eval - r) @ mass @ (r_eval - r).T) / norm_r
     return err_r
 
 
-def face(sd, P0q, q_ex):
+def face(sd, P0q, q_ex=None, q_hat=None):
+    if q_ex is not None:
+        q_eval = q_ex(sd)
+    if q_hat is not None:
+        q_eval = q_hat
+
     norm_q = np.sqrt(
-        np.trace(q_ex(sd) @ sps.diags(sd.cell_volumes) @ q_ex(sd).T)
+        np.trace(q_eval @ sps.diags(sd.cell_volumes) @ q_eval.T)
     )
     err_q = np.sqrt(
-        np.trace((q_ex(sd) - P0q) @ sps.diags(sd.cell_volumes) @ (q_ex(sd) - P0q).T)
+        np.trace((q_eval - P0q) @ sps.diags(sd.cell_volumes) @ (q_eval - P0q).T)
     ) / norm_q
     return err_q
 
-def cell(sd, p, p_ex):
-    #norm_p = np.sqrt(p_ex(sd) @ sps.diags(sd.cell_volumes) @ p_ex(sd).T)
-    #err_p = np.sqrt((p_ex(sd) - p) @ sps.diags(sd.cell_volumes) @ (p_ex(sd) - p).T) / norm_p
-    norm_p = _cell_error(sd, np.zeros(sd.num_cells), p_ex(sd))
-    err_p = _cell_error(sd, p, p_ex(sd)) / norm_p
+def cell(sd, p, p_ex=None, p_hat=None):
+    if p_ex is not None:
+        p_eval = p_ex(sd)
+    if p_hat is not None:
+        p_eval = p_hat
+
+    norm_p = _cell_error(sd, np.zeros(sd.num_cells), p_eval)
+    err_p = _cell_error(sd, p, p_eval) / norm_p
+    return err_p
+
+def cell_center(sd, p, p_ex=None, p_hat=None):
+    if p_ex is not None:
+        p_eval = p_ex(sd)
+    if p_hat is not None:
+        p_eval = p_hat
+
+    norm_p = np.sqrt(p_eval @ sps.diags(sd.cell_volumes) @ p_eval.T)
+    err_p = np.sqrt((p_eval - p) @ sps.diags(sd.cell_volumes) @ (p_eval - p).T) / norm_p
+
     return err_p
 
 def order(err, h):
+    err = np.asarray(err)
+    h = np.asarray(h)
     return np.log(err[:-1] / err[1:]) / np.log(h[:-1] / h[1:])
 
 def _cell_error(sd, sol, sol_ex):
