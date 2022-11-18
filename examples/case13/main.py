@@ -3,9 +3,13 @@ import scipy.sparse as sps
 import porepy as pp
 import pygeon as pg
 
-import sys; sys.path.append("../../src/")
+import sys
+
+sys.path.append("../../src/")
+
 from mandel import compute_true_solutions
 from create_grid import create_grid
+
 
 def main(n):
 
@@ -24,11 +28,13 @@ def main(n):
     perm = 9.869e-11
     F = 6e8
 
-    delta = np.sqrt(1)
-    num_time_steps = 1e2
+    delta = np.sqrt(1e1)
+    num_time_steps = 100
 
     n_alpha = 100
-    p_true, u_true = compute_true_solutions([labda, mu, c0, alpha, perm], [F, a, b], n_alpha)
+    p_true, u_true = compute_true_solutions(
+        [labda, mu, c0, alpha, perm], [F, a, b], n_alpha
+    )
 
     # dscretization
     L1 = pg.Lagrange1(elast_key)
@@ -54,7 +60,7 @@ def main(n):
 
         # flow
         flow_param = {
-            "second_order_tensor": pp.SecondOrderTensor(perm*np.ones(sd.num_cells))
+            "second_order_tensor": pp.SecondOrderTensor(perm * np.ones(sd.num_cells))
         }
 
         data[pp.PARAMETERS] = {elast_key: elast_param, flow_key: flow_param}
@@ -78,20 +84,20 @@ def main(n):
     dofs = np.cumsum([ridge_dof, face_dof, face_dof])
 
     # assemble the saddle point problem
-    spp = sps.bmat([
-        [2/mu*ridge_mass,              -curl.T,           None,         None],
-        [           curl, (labda + mu)*div_div,           None, -alpha*div.T],
-        [           None,                 None, face_perm_mass, -delta*div.T],
-        [           None,            alpha*div,      delta*div, c0*cell_mass]
-        ], format="csc")
+    spp = sps.bmat(
+        [
+            [2 / mu * ridge_mass, -curl.T, None, None],
+            [curl, (labda + mu) * div_div, None, -alpha * div.T],
+            [None, None, face_perm_mass, -delta * div.T],
+            [None, alpha * div, delta * div, c0 * cell_mass],
+        ],
+        format="csc",
+    )
 
     # projection matrices
     ridge_proj = pg.eval_at_cell_centers(mdg, L1)
     face_proj = pg.eval_at_cell_centers(mdg, RT0)
     cell_proj = pg.eval_at_cell_centers(mdg, P0)
-
-    vals = [p_true([0, 0.5, 0], t) for t in np.linspace(0, 10, 10)]
-    import pdb; pdb.set_trace()
 
     u = RT0.interpolate(sd, lambda x: u_true(x, 0))
     p = P0.interpolate(sd, lambda x: p_true([0, 0, 0], 0))
@@ -99,31 +105,34 @@ def main(n):
     rhs = np.zeros(spp.shape[0])
     bc_val = np.zeros(spp.shape[0])
 
-    exporter = pp.Exporter(mdg, "sol", folder_name="sol")
+    exporter = pp.Exporter(
+        mdg, "sol", folder_name="sol", export_constants_separately=False
+    )
 
     def export_sol(r, u, q, p, u_ex, p_ex, t_step):
         for sd, data in mdg.subdomains(return_data=True):
-            data[pp.STATE] = {"r": ridge_proj * r,
-                              "p": cell_proj * p,
-                              "p_ex": cell_proj * p_ex,
-                              "u": (face_proj * u).reshape((3, -1), order="F"),
-                              "u_ex": (face_proj * u_ex).reshape((3, -1), order="F"),
-                              "q": (face_proj * q).reshape((3, -1), order="F"),
-                              }
+            data[pp.STATE] = {
+                "r": ridge_proj * r,
+                "p": cell_proj * p,
+                "p_ex": cell_proj * p_ex,
+                "u": (face_proj * u).reshape((3, -1), order="F"),
+                "u_ex": (face_proj * u_ex).reshape((3, -1), order="F"),
+                "q": (face_proj * q).reshape((3, -1), order="F"),
+            }
         exporter.write_vtu([*data[pp.STATE].keys()], time_step=t_step)
 
     export_sol(np.zeros(sd.num_ridges), u, np.zeros(sd.num_faces), p, u, p, 0)
 
     for t_step in np.arange(1, num_time_steps):
-        time = t_step*(delta**2)
-        print(time, t_step, num_time_steps)
+        time = t_step * (delta**2)
+        print(int(time), t_step, num_time_steps)
 
         # previous time step contribution
         rhs[-cell_dof:] = alpha * div * u + c0 * cell_mass * p
 
         # set the boundary condition
         u_bc = RT0.interpolate(sd, lambda x: u_true(x, time))
-        bc_val[dofs[0]:dofs[1]] = u_bc
+        bc_val[dofs[0] : dofs[1]] = u_bc
 
         # create the linear system
         ls = pg.LinearSystem(spp, rhs)
@@ -138,7 +147,8 @@ def main(n):
 
         export_sol(r, u, q, p, u_at_time, p_at_time, t_step)
 
-    exporter.write_pvd(np.arange(num_time_steps)*delta**2)
+    exporter.write_pvd(np.arange(num_time_steps) * delta**2)
+
 
 if __name__ == "__main__":
-    main(100)
+    main(50)
