@@ -143,7 +143,7 @@ def main(n, keyword="flow"):
 
 if __name__ == "__main__":
 
-    N = np.arange(9, 14)
+    N = [3, 7, 11, 15, 19] #np.arange(9, 14)
     err = np.array([main(n) for n in N])
 
     order_r = error.order(err[:, 1], err[:, 0])
