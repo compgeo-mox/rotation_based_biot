@@ -16,12 +16,8 @@ def compute_alpha(factor, n, tol=1e-7):
     if factor < 1:
         raise ValueError
 
-    bracket = (np.array([tol, 1 - tol]) / 2) * np.pi
-    root_result = optimize.root_scalar(f, bracket=bracket, method="bisect")
-    alpha[0] = root_result.root
-
-    for ind in range(1, n):
-        bracket = (np.array([0, 1 - tol]) / 2 + ind) * np.pi
+    for ind in range(n):
+        bracket = (np.array([tol, 1 - tol]) / 2 + ind) * np.pi
         root_result = optimize.root_scalar(f, bracket=bracket, method="bisect")
 
         if root_result.converged:
@@ -50,6 +46,7 @@ def convert_parameters(param):
 
     return B, nu, nu_u, c_f, alpha_factor
 
+
 def true_solution(old_param, bc_param, converted_param, alpha_n):
     mu = old_param[1]
     F, a, _ = bc_param
@@ -71,8 +68,12 @@ def true_solution(old_param, bc_param, converted_param, alpha_n):
         common_sum *= np.exp(-np.square(alpha_n) * c_f * t / (a**2))
         common_sum = np.sum(common_sum)
 
-        x_sum = np.cos(alpha_n) / (alpha_n - np.sin(alpha_n)*np.cos(alpha_n)) * \
-            np.sin(alpha_n * x[0] / a) * np.exp(-np.square(alpha_n) * c_f * t / (a**2))
+        x_sum = (
+            np.cos(alpha_n)
+            / (alpha_n - np.sin(alpha_n) * np.cos(alpha_n))
+            * np.sin(alpha_n * x[0] / a)
+            * np.exp(-np.square(alpha_n) * c_f * t / (a**2))
+        )
 
         result_x = -F * nu_u / (mu * a) * common_sum
         result_x += F * nu / (2 * mu * a)
@@ -86,15 +87,17 @@ def true_solution(old_param, bc_param, converted_param, alpha_n):
 
     return p, u
 
+
 def compute_true_solutions(param, bc_param, n_alpha=10):
     converted_param = convert_parameters(param)
     alpha_n = compute_alpha(converted_param[-1], n_alpha)
     return true_solution(param, bc_param, converted_param, alpha_n)
 
+
 if __name__ == "__main__":
 
     n_alpha = 10
-    param = [labda, mu, c_0, alpha, perm]
-    p, u = compute_true_solutions(param, bc_param, n_alpha)
+    # param = [labda, mu, c_0, alpha, perm]
+    # p, u = compute_true_solutions(param, bc_param, n_alpha)
 
-    print(alpha)
+    # print(alpha)
