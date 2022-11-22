@@ -8,16 +8,16 @@ import error
 def curl_r_ex(pt):
     x, y, z = pt
 
-    first = x*(-24.0*x**3*y**2 + 24.0*x**3*y - 4.0*x**3 - 8.0*x**2*y**3 + 60.0*x**2*y**2 - 52.0*x**2*y + 8.0*x**2 + 12.0*x*y**3 - 42.0*x*y**2 + 30.0*x*y - 4.0*x - 4.0*y**3 + 6.0*y**2 - 2.0*y)
-    second = y*(32.0*x**3*y**2 - 48.0*x**3*y + 16.0*x**3 + 6.0*x**2*y**3 - 60.0*x**2*y**2 + 78.0*x**2*y - 24.0*x**2 - 6.0*x*y**3 + 28.0*x*y**2 - 30.0*x*y + 8.0*x + 1.0*y**3 - 2.0*y**2 + 1.0*y)
-    third = 0
+    first = x*(x - 1)*(y**2*z*(y - 1)**2*(z - 1)*(2.0*x*z - 8.0*x*(x - 1) + 2.0*x*(z - 1) + 2.0*z*(x - 1) + 2.0*(x - 1)*(z - 1)) - y**2*z*(y - 1)**2*(4.0*x*z*(x - 1) - 2.0*x*z*(z - 1) + 4.0*x*(x - 1)*(z - 1) - 2.0*z*(x - 1)*(z - 1)) - y**2*(y - 1)**2*(z - 1)*(4.0*x*z*(x - 1) - 2.0*x*z*(z - 1) + 4.0*x*(x - 1)*(z - 1) - 2.0*z*(x - 1)*(z - 1)) - y*z**2*(z - 1)**2*(4.0*x*y*(x - 1) + 2.0*x*y*(y - 1) + 12.0*x*(x - 1)*(y - 1) + 1.0*x*(y - 1)**2 + 2.0*y*(x - 1)*(y - 1) + 1.0*(x - 1)*(y - 1)**2) - z**2*(y - 1)*(z - 1)**2*(4.0*x*y*(x - 1) + 1.0*x*y*(y - 1) + 4.0*x*(x - 1)*(y - 1) + 1.0*y*(x - 1)*(y - 1)))
+    second = y*(y - 1)*(2.0*x**2*z*(x - 1)**2*(z - 1)*(y*z + y*(y - 1) + y*(z - 1) + z*(y - 1) + (y - 1)*(z - 1)) + x**2*z*(x - 1)**2*(1.0*y*z*(y - 1) + 2.0*y*z*(z - 1) + 1.0*y*(y - 1)*(z - 1) + 2.0*z*(y - 1)*(z - 1)) + x**2*(x - 1)**2*(z - 1)*(1.0*y*z*(y - 1) + 2.0*y*z*(z - 1) + 1.0*y*(y - 1)*(z - 1) + 2.0*z*(y - 1)*(z - 1)) + x*z**2*(z - 1)**2*(8.0*x*y*(x - 1) + 1.0*x*y*(y - 1) + 8.0*x*(x - 1)*(y - 1) + 4.0*y*(x - 1)**2 + 3.0*y*(x - 1)*(y - 1) + 4.0*(x - 1)**2*(y - 1)) + z**2*(x - 1)*(z - 1)**2*(4.0*x*y*(x - 1) + 1.0*x*y*(y - 1) + 4.0*x*(x - 1)*(y - 1) + 1.0*y*(x - 1)*(y - 1)))
+    third = z*(z - 1)*(-x**2*y*(x - 1)**2*(y - 1)*(1.0*y*z + 1.0*y*(z - 1) + 1.0*z*(y - 1) + 4.0*z*(z - 1) + 1.0*(y - 1)*(z - 1)) - x**2*y*(x - 1)**2*(1.0*y*z*(y - 1) + 2.0*y*z*(z - 1) + 1.0*y*(y - 1)*(z - 1) + 2.0*z*(y - 1)*(z - 1)) - x**2*(x - 1)**2*(y - 1)*(1.0*y*z*(y - 1) + 2.0*y*z*(z - 1) + 1.0*y*(y - 1)*(z - 1) + 2.0*z*(y - 1)*(z - 1)) + x*y**2*(y - 1)**2*(8.0*x*z*(x - 1) - 2.0*x*z*(z - 1) + 8.0*x*(x - 1)*(z - 1) + 4.0*z*(x - 1)**2 - 6.0*z*(x - 1)*(z - 1) + 4.0*(x - 1)**2*(z - 1)) + y**2*(x - 1)*(y - 1)**2*(4.0*x*z*(x - 1) - 2.0*x*z*(z - 1) + 4.0*x*(x - 1)*(z - 1) - 2.0*z*(x - 1)*(z - 1)))
 
     return np.vstack((first, second, third))
 
 def div_u_ex(pt):
     x, y, z = pt
 
-    return 2*x*y*(x - 1)*(x*y*(1 - y)*(x - 1) + 4*x*y*(y - 1)**2 - x*(x - 1)*(y - 1)**2 + 4*y*(x - 1)*(y - 1)**2)
+    return 2*x*y*z*(x - 1)*(z - 1)*(x*y*z*(1 - y)*(x - 1)*(z - 1) + 2*x*y*z*(x - 1)*(y - 1)**2 + 4*x*y*z*(y - 1)**2*(z - 1) + 2*x*y*(x - 1)*(y - 1)**2*(z - 1) - x*z*(x - 1)*(y - 1)**2*(z - 1) + 4*y*z*(x - 1)*(y - 1)**2*(z - 1))
 
 def load(N, folder):
 
@@ -34,7 +34,7 @@ def load(N, folder):
 def create_grid(n):
     # make the grid
     domain = {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1}
-    network = pp.FractureNetwork2d(domain=domain)
+    network = pp.FractureNetwork3d(domain=domain)
 
     mesh_size = 1/n
     mesh_kwargs = {"mesh_size_frac": mesh_size, "mesh_size_min": mesh_size}
@@ -48,10 +48,10 @@ def create_grid(n):
 def main():
 
     keyword="flow"
-    N = 2 ** np.arange(4, 9)
+    N = [3, 7, 11, 15, 19] #np.arange(9, 14)
 
-    curl_r, div_u, r, u = load(N, "../case1/")
-    curl_hat_r, div_hat_u, hat_r, hat_u = load(N, "../case2/")
+    curl_r, div_u, r, u = load(N, "../case5/")
+    curl_hat_r, div_hat_u, hat_r, hat_u = load(N, "../case6/")
 
     h, err_curl_r, err_div_u, err_r, err_u = [], [], [], [], []
     err_ex_curl_r, err_ex_curl_hat_r = [], []
@@ -62,11 +62,20 @@ def main():
         for sd in mdg.subdomains():
             pass
 
+        print(r[i].size, u[i].size, r[i].size + u[i].size)
+
         RT0 = pg.RT0(keyword)
+        N0 = pg.Nedelec0(keyword)
+        N1 = pg.Nedelec1(keyword)
         P0 = pg.PwConstants(keyword)
 
+        ridge_proj_n0 = pg.eval_at_cell_centers(mdg, N0)
+        ridge_proj_n1 = pg.eval_at_cell_centers(mdg, N1)
         face_proj = pg.eval_at_cell_centers(mdg, RT0)
         cell_proj = pg.eval_at_cell_centers(mdg, P0)
+
+        cell_r = (ridge_proj_n0 * r[i]).reshape((3, -1), order="F")
+        cell_hat_r = (ridge_proj_n1 * hat_r[i]).reshape((3, -1), order="F")
 
         cell_u = (face_proj * u[i]).reshape((3, -1), order="F")
         cell_hat_u = (face_proj * hat_u[i]).reshape((3, -1), order="F")
@@ -79,7 +88,7 @@ def main():
 
         h.append(error.geometry_info(sd)[0])
 
-        err_r.append(error.ridge(sd, r[i], r_hat = hat_r[i]))
+        err_r.append(error.ridge(sd, cell_r, r_hat = cell_hat_r))
         err_u.append(error.face(sd, cell_u, q_hat = cell_hat_u))
 
         err_curl_r.append(error.face(sd, cell_curl_r, q_hat = cell_curl_hat_r))
@@ -128,6 +137,7 @@ def main():
 
     print("err_ex_div_hat_u\n", err_ex_div_hat_u)
     print("order_ex_div_hat_u\n", order_ex_div_hat_u)
+
 
 if __name__ == "__main__":
     main()

@@ -38,7 +38,7 @@ def flow_scalar_source(u, q, p, R):
 
     return (alpha*div_u + delta*div_q + c0*p).simplify()
 
-## -------------------------------------------------------------------##
+##-------------------------------------------------------------------##
 
 def two_dim(R):
     """
@@ -51,6 +51,7 @@ def two_dim(R):
     u = i * (4*x**2*(1-x)**2*y**2*(1-y)**2*z**2*(1-z)**2)\
       + j * (-x**2*(1-x)**2*y**2*(1-y)**2*z**2*(1-z)**2)\
       + k * (2*x**2*(1-x)**2*y**2*(1-y)**2*z**2*(1-z)**2)
+
     print("displacement\n", to_numpy_vector(u, R, 0))
     print("displacement\n", to_numpy_vector(u, R, 1))
     print("displacement\n", to_numpy_vector(u, R, 2))
@@ -83,8 +84,18 @@ def two_dim(R):
     w = flow_scalar_source(u, q, p, R)
     print("flow scalar source\n", to_numpy_scalar(w, R))
 
+    curl_r = curl(r, R).simplify()
+    print("curl_r\n", to_numpy_vector(curl_r, R, 0))
+    print("curl_r\n", to_numpy_vector(curl_r, R, 1))
+    print("curl_r\n", to_numpy_vector(curl_r, R, 2))
 
-## -------------------------------------------------------------------##
+    div_u = divergence(u, R).simplify()
+    print("div_u\n", to_numpy_scalar(div_u, R))
+
+    div_q = divergence(q, R).simplify()
+    print("div_q\n", to_numpy_scalar(div_q, R))
+
+##-------------------------------------------------------------------##
 
 if __name__ == "__main__":
     R = ReferenceFrame("R")

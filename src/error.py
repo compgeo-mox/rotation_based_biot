@@ -37,12 +37,23 @@ def face(sd, P0q, q_ex=None, q_hat=None):
     )
     err_q = np.sqrt(
         np.trace((q_eval - P0q) @ sps.diags(sd.cell_volumes) @ (q_eval - P0q).T)
-    ) / norm_q
+    ) / (norm_q if norm_q else 1)
+    return err_q
+
+def face_v1(sd, q, q_ex=None, q_hat=None):
+    if q_ex is not None:
+        q_eval = q_ex(sd)
+    if q_hat is not None:
+        q_eval = q_hat
+
+    mass = pg.RT0("flow").assemble_mass_matrix(sd, None)
+    norm_q = np.sqrt(q_eval @ mass @ q_eval.T)
+    err_q = np.sqrt(((q_eval - q) @ mass @ (q_eval - q).T)) / (norm_q if norm_q else 1)
     return err_q
 
 def cell(sd, p, p_ex=None, p_hat=None):
     if p_ex is not None:
-        p_eval = p_ex(sd)
+        p_eval = p_ex(sd.nodes)
     if p_hat is not None:
         p_eval = p_hat
 

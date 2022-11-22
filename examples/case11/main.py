@@ -36,25 +36,6 @@ def r_ex(sd):
     y = sd.nodes[1, :]
     return x*y*(1.0*x*y*(1 - x)*(y - 1)**2 + 4.0*x*y*(1 - y)*(x - 1)**2 - 4.0*x*(x - 1)**2*(y - 1)**2 - 1.0*y*(x - 1)**2*(y - 1)**2)
 
-def u_ex(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
-    first = 4*x**2*y**2*(1 - x)**2*(1 - y)**2
-    second = -x**2*y**2*(1 - x)**2*(1 - y)**2
-    return np.vstack((first, second, np.zeros(sd.num_cells)))
-
-def q_ex(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
-    first = np.sin(2*x*np.pi)*np.sin(2*y*np.pi)
-    second = x*y*(1 - x)*(1 - y)
-    return np.vstack((first, second, np.zeros(sd.num_cells)))
-
-def p_ex(sd):
-    x = sd.nodes[0, :]
-    y = sd.nodes[1, :]
-    return x*y*(1 - x)*(1 - y)
-
 def create_grid(n):
     # make the grid
     domain = {"xmin": 0, "xmax": 1, "ymin": 0, "ymax": 1, "zmin": 0, "zmax": 1}
@@ -69,20 +50,22 @@ def create_grid(n):
 
     return mdg
 
-def main(n):
-    mdg = create_grid(n)
+class minres_counter(object):
+    def __init__(self, disp=True):
+        self._disp = disp
+        self.niter = 0
+    def __call__(self, rk=None):
+        self.niter += 1
+        if self._disp:
+            #print('iter %3i\trk = %s' % (self.niter, str(rk)))
+            print('iter %3i' % self.niter)
 
+def main(n, mu, labda, k, alpha, c0, delta):
+    print("Perform simulation for", n, mu, labda, k, alpha, c0, delta)
+
+    mdg = create_grid(n)
     elast_key = "elasticity"
     flow_key = "flow"
-
-    # problem data
-    mu, labda, alpha, c0 = 1, 1, 1, 1
-    delta = 1
-
-    # dscretization
-    L1 = pg.Lagrange1(elast_key)
-    RT0 = pg.RT0(flow_key)
-    P0 = pg.PwConstants(flow_key)
 
     # set the bc data and source terms
     elast_bc_val, elast_bc_ess, elast_v_source = [], [], []
@@ -108,7 +91,7 @@ def main(n):
 
         # flow
         flow_param = {
-            "second_order_tensor": pp.SecondOrderTensor(np.ones(sd.num_cells))
+            "second_order_tensor": pp.SecondOrderTensor(k*np.ones(sd.num_cells))
         }
 
         flow_bc_val.append(np.hstack((bc_faces, np.zeros(sd.num_cells))))
@@ -138,15 +121,15 @@ def main(n):
     dofs = np.cumsum([ridge_dof, face_dof, face_dof])
 
     # assemble the saddle point problem
-    spp = sps.bmat([
-        [2/mu*ridge_mass,              -curl.T,           None,         None],
-        [           curl, (labda + mu)*div_div,           None, -alpha*div.T],
-        [           None,                 None, face_perm_mass, -delta*div.T],
-        [           None,            alpha*div,      delta*div, c0*cell_mass]
+    mat = sps.bmat([
+        [2/mu*ridge_mass,               -curl.T,            None,         None],
+        [          -curl, -(labda + mu)*div_div,            None,  alpha*div.T],
+        [           None,                  None, -face_perm_mass,  delta*div.T],
+        [           None,             alpha*div,       delta*div, c0*cell_mass]
         ], format="csc")
 
     # assemble the right-hand side
-    rhs = np.zeros(spp.shape[0])
+    rhs = np.zeros(mat.shape[0])
     # data from the elastic problem
     rhs[:dofs[1]] += np.hstack(elast_bc_val)
     rhs[dofs[0]:dofs[1]] += face_mass * np.hstack(elast_v_source)
@@ -155,75 +138,58 @@ def main(n):
     rhs[dofs[1]:dofs[2]] += face_mass * np.hstack(flow_v_source)
     rhs[dofs[2]:] += np.hstack(flow_s_source)
 
-    # projection matrices
-    ridge_proj = pg.eval_at_cell_centers(mdg, L1)
-    face_proj = pg.eval_at_cell_centers(mdg, RT0)
-    cell_proj = pg.eval_at_cell_centers(mdg, P0)
+    # create the preconditioner
+    L1 = pg.Lagrange1(elast_key)
+    RT0 = pg.RT0(elast_key)
+
+    face_stiff = RT0.assemble_stiff_matrix(sd, data)
+    eta = alpha**2 / (labda + mu) + delta**2 * k
+
+    p1 = 2/mu*(ridge_mass + L1.assemble_stiff_matrix(sd, data))
+    p2 = mu/2*face_mass + (labda + mu) * face_stiff
+    p3 = 1/k*face_mass + (delta**2) / (eta + c0) * face_stiff
+    p4 = (eta + c0) * cell_mass
+
+    precond = sps.block_diag([p1, p2, p3, p4], format="csc")
+
+    ls_precond = pg.LinearSystem(precond)
+    ls_precond.flag_ess_bc(bc_ess, np.zeros(bc_ess.size))
+    precond_0, _, _ = ls_precond.reduce_system()
+    apply_precond = lambda x: sps.linalg.spsolve(precond_0, x)
+    M = sps.linalg.LinearOperator(precond_0.shape, matvec=apply_precond)
+
+    counter = minres_counter()
+    solver = lambda A, b: sps.linalg.minres(A, b, M=M, callback=counter)[0]
 
     # solve the problem
-    ls = pg.LinearSystem(spp, rhs)
+    ls = pg.LinearSystem(mat, rhs)
     ls.flag_ess_bc(bc_ess, np.zeros(bc_ess.size))
-    x = ls.solve()
+    x = ls.solve(solver=solver)
 
-    # extract the variables
-    r, u, q, p = np.split(x, dofs)
+    A_0, _, _ = ls.reduce_system()
+    l_M = sps.linalg.eigsh(A_0, k=1, M=precond_0, which="LM", return_eigenvectors=False, tol=1e-4)
+    l_m = sps.linalg.eigsh(A_0, k=1, M=precond_0, which="SM", return_eigenvectors=False, tol=1e-4)
 
-    # post process rotation
-    cell_r = ridge_proj * r
-
-    # post process displacement
-    cell_u = (face_proj * u).reshape((3, -1), order="F")
-
-    # post process Darcy velocity
-    cell_q = (face_proj * q).reshape((3, -1), order="F")
-
-    # post process Darcy pressure
-    cell_p = cell_proj * p
-
-    # compute the error
-    h, *_ = error.geometry_info(sd)
-
-    err_r = error.ridge(sd, r, r_ex)
-    err_u = error.face(sd, cell_u, u_ex)
-    err_q = error.face(sd, cell_q, q_ex)
-    err_p = error.cell(sd, cell_p, p_ex)
-
-    curl_r = pg.curl(mdg) * r
-    div_u = pg.div(mdg) * u
-    div_q = pg.div(mdg) * q
-
-    # save some of the info to file
-    np.savetxt("curl_r_" + str(n), curl_r)
-    np.savetxt("div_u_" + str(n), div_u)
-    np.savetxt("div_q_" + str(n), div_q)
-    np.savetxt("r_" + str(n), r)
-    np.savetxt("u_" + str(n), u)
-    np.savetxt("q_" + str(n), q)
-    np.savetxt("p_" + str(n), p)
-
-    return h, err_r, err_u, err_q, err_p
+    return counter.niter, l_M[0], l_m[0]
 
 if __name__ == "__main__":
 
-    N = 2 ** np.arange(4, 9)
+    n_val = 2 ** np.arange(4, 9)
+    mu_val = np.array([1e-4, 1, 1e4])
+    labda_val = np.array([1e-4, 1, 1e4])
+    k_val = np.array([1e-4, 1, 1e4])
+    alpha_val = np.array([0, 1])
+    c0_val = np.array([0, 10, 100])
+    delta_val = np.array([1e-4, 1e-2, 1])
 
-    err = np.array([main(n) for n in N])
+    results = np.array([(n, mu, labda, k, alpha, c0, delta,
+                         *main(n, mu, labda, k, alpha, c0, delta))
+                          for n in n_val \
+                          for mu in mu_val \
+                          for labda in labda_val \
+                          for k in k_val \
+                          for alpha in alpha_val \
+                          for c0 in c0_val \
+                          for delta in delta_val])
 
-    order_r = error.order(err[:, 1], err[:, 0])
-    order_u = error.order(err[:, 2], err[:, 0])
-    order_q = error.order(err[:, 3], err[:, 0])
-    order_p = error.order(err[:, 4], err[:, 0])
-
-    print("h\n", err[:, 0])
-
-    print("err_r\n", err[:, 1])
-    print("order_r\n", order_r)
-
-    print("err_u\n", err[:, 2])
-    print("order_u\n", order_u)
-
-    print("err_q\n", err[:, 3])
-    print("order_q\n", order_u)
-
-    print("err_p\n", err[:, 4])
-    print("order_p\n", order_u)
+    np.savetxt("iterations.txt", results)

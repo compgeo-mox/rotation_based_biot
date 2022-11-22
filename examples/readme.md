@@ -7,6 +7,6 @@ case6: convergence 3d elasticity hyb - OK
 case7: convergence 3d biot - OK
 case8: convergence 3d biot hyb - TODO
 case9: preconditioner 2d elasticity - OK
-case10: preconditioner 3d elasticity - OK cond not good
+case10: preconditioner 3d elasticity - OK
 case11: preconditioner 2d biot - OK
 case12: preconditioner 3d biot - TODO

@@ -6,41 +6,31 @@ import pygeon as pg
 import sys; sys.path.append("../../src/")
 import error
 
-def elast_vector_source(sd):
-    x = sd.face_centers[0, :]
-    y = sd.face_centers[1, :]
-    z = sd.face_centers[2, :]
+def elast_vector_source(pt):
+    x, y, z = pt
 
     first = -16*x**2*y**2*z**2*(x - 1)*(y - 1)**2*(z - 1) + 8*x**2*y**2*z**2*(x - 1)*(y - 1)*(z - 1)**2 - 16*x**2*y**2*z**2*(y - 1)**2*(z - 1)**2 - 16*x**2*y**2*z*(x - 1)*(y - 1)**2*(z - 1)**2 + 8*x**2*y*z**2*(x - 1)*(y - 1)**2*(z - 1)**2 - 16*x*y**2*z**2*(x - 1)**2*(y - 1)**2*(z - 1) + 8*x*y**2*z**2*(x - 1)**2*(y - 1)*(z - 1)**2 - 64*x*y**2*z**2*(x - 1)*(y - 1)**2*(z - 1)**2 - 16*x*y**2*z*(x - 1)**2*(y - 1)**2*(z - 1)**2 + x*y**2*z*(x - 1)*(y - 1)**2*(z - 1)*(2.0*x*z - 8.0*x*(x - 1) + 2.0*x*(z - 1) + 2.0*z*(x - 1) + 2.0*(x - 1)*(z - 1)) - x*y**2*z*(x - 1)*(y - 1)**2*(4.0*x*z*(x - 1) - 2.0*x*z*(z - 1) + 4.0*x*(x - 1)*(z - 1) - 2.0*z*(x - 1)*(z - 1)) - x*y**2*(x - 1)*(y - 1)**2*(z - 1)*(4.0*x*z*(x - 1) - 2.0*x*z*(z - 1) + 4.0*x*(x - 1)*(z - 1) - 2.0*z*(x - 1)*(z - 1)) + 8*x*y*z**2*(x - 1)**2*(y - 1)**2*(z - 1)**2 - x*y*z**2*(x - 1)*(z - 1)**2*(4.0*x*y*(x - 1) + 2.0*x*y*(y - 1) + 12.0*x*(x - 1)*(y - 1) + 1.0*x*(y - 1)**2 + 2.0*y*(x - 1)*(y - 1) + 1.0*(x - 1)*(y - 1)**2) - x*y*z*(y - 1)*(z - 1) - x*z**2*(x - 1)*(y - 1)*(z - 1)**2*(4.0*x*y*(x - 1) + 1.0*x*y*(y - 1) + 4.0*x*(x - 1)*(y - 1) + 1.0*y*(x - 1)*(y - 1)) - 16*y**2*z**2*(x - 1)**2*(y - 1)**2*(z - 1)**2 - y*z*(x - 1)*(y - 1)*(z - 1)
     second = -16*x**2*y**2*z**2*(x - 1)**2*(y - 1)*(z - 1) + 4*x**2*y**2*z**2*(x - 1)**2*(z - 1)**2 - 32*x**2*y**2*z**2*(x - 1)*(y - 1)*(z - 1)**2 - 16*x**2*y**2*z*(x - 1)**2*(y - 1)*(z - 1)**2 - 16*x**2*y*z**2*(x - 1)**2*(y - 1)**2*(z - 1) + 16*x**2*y*z**2*(x - 1)**2*(y - 1)*(z - 1)**2 - 32*x**2*y*z**2*(x - 1)*(y - 1)**2*(z - 1)**2 - 16*x**2*y*z*(x - 1)**2*(y - 1)**2*(z - 1)**2 + 2.0*x**2*y*z*(x - 1)**2*(y - 1)*(z - 1)*(y*z + y*(y - 1) + y*(z - 1) + z*(y - 1) + (y - 1)*(z - 1)) + x**2*y*z*(x - 1)**2*(y - 1)*(1.0*y*z*(y - 1) + 2.0*y*z*(z - 1) + 1.0*y*(y - 1)*(z - 1) + 2.0*z*(y - 1)*(z - 1)) + x**2*y*(x - 1)**2*(y - 1)*(z - 1)*(1.0*y*z*(y - 1) + 2.0*y*z*(z - 1) + 1.0*y*(y - 1)*(z - 1) + 2.0*z*(y - 1)*(z - 1)) + 4*x**2*z**2*(x - 1)**2*(y - 1)**2*(z - 1)**2 - 32*x*y**2*z**2*(x - 1)**2*(y - 1)*(z - 1)**2 - 32*x*y*z**2*(x - 1)**2*(y - 1)**2*(z - 1)**2 + x*y*z**2*(y - 1)*(z - 1)**2*(8.0*x*y*(x - 1) + 1.0*x*y*(y - 1) + 8.0*x*(x - 1)*(y - 1) + 4.0*y*(x - 1)**2 + 3.0*y*(x - 1)*(y - 1) + 4.0*(x - 1)**2*(y - 1)) - x*y*z*(x - 1)*(z - 1) - x*z*(x - 1)*(y - 1)*(z - 1) + y*z**2*(x - 1)*(y - 1)*(z - 1)**2*(4.0*x*y*(x - 1) + 1.0*x*y*(y - 1) + 4.0*x*(x - 1)*(y - 1) + 1.0*y*(x - 1)*(y - 1))
     third = -8*x**2*y**2*z**2*(x - 1)**2*(y - 1)**2 + 8*x**2*y**2*z**2*(x - 1)**2*(y - 1)*(z - 1) - 32*x**2*y**2*z**2*(x - 1)*(y - 1)**2*(z - 1) - 32*x**2*y**2*z*(x - 1)**2*(y - 1)**2*(z - 1) + 8*x**2*y**2*z*(x - 1)**2*(y - 1)*(z - 1)**2 - 32*x**2*y**2*z*(x - 1)*(y - 1)**2*(z - 1)**2 - 8*x**2*y**2*(x - 1)**2*(y - 1)**2*(z - 1)**2 + 8*x**2*y*z**2*(x - 1)**2*(y - 1)**2*(z - 1) + 8*x**2*y*z*(x - 1)**2*(y - 1)**2*(z - 1)**2 - x**2*y*z*(x - 1)**2*(y - 1)*(z - 1)*(1.0*y*z + 1.0*y*(z - 1) + 1.0*z*(y - 1) + 4.0*z*(z - 1) + 1.0*(y - 1)*(z - 1)) - x**2*y*z*(x - 1)**2*(z - 1)*(1.0*y*z*(y - 1) + 2.0*y*z*(z - 1) + 1.0*y*(y - 1)*(z - 1) + 2.0*z*(y - 1)*(z - 1)) - x**2*z*(x - 1)**2*(y - 1)*(z - 1)*(1.0*y*z*(y - 1) + 2.0*y*z*(z - 1) + 1.0*y*(y - 1)*(z - 1) + 2.0*z*(y - 1)*(z - 1)) - 32*x*y**2*z**2*(x - 1)**2*(y - 1)**2*(z - 1) - 32*x*y**2*z*(x - 1)**2*(y - 1)**2*(z - 1)**2 + x*y**2*z*(y - 1)**2*(z - 1)*(8.0*x*z*(x - 1) - 2.0*x*z*(z - 1) + 8.0*x*(x - 1)*(z - 1) + 4.0*z*(x - 1)**2 - 6.0*z*(x - 1)*(z - 1) + 4.0*(x - 1)**2*(z - 1)) - x*y*z*(x - 1)*(y - 1) - x*y*(x - 1)*(y - 1)*(z - 1) + y**2*z*(x - 1)*(y - 1)**2*(z - 1)*(4.0*x*z*(x - 1) - 2.0*x*z*(z - 1) + 4.0*x*(x - 1)*(z - 1) - 2.0*z*(x - 1)*(z - 1))
 
-    source = np.vstack((first, second, third))
-    return np.sum(sd.face_normals * source, axis=0)
+    return np.vstack((first, second, third))
 
-def flow_vector_source(sd):
-    x = sd.face_centers[0, :]
-    y = sd.face_centers[1, :]
-    z = sd.face_centers[2, :]
+def flow_vector_source(pt):
+    x, y, z = pt
 
     first = -x*y*z*(y - 1)*(z - 1) - y*z*(x - 1)*(y - 1)*(z - 1) + np.sin(2*x*np.pi)*np.sin(2*y*np.pi)*np.sin(2*z*np.pi)
     second = x*z*(x - 1)*(z - 1)*(-y*(y - 1) - 2*y + 1)
     third = -y*(y - 1)*(x*z*(x - 1) + x*(x - 1)*(z - 1) + np.sin(2*x*np.pi)*np.sin(2*z*np.pi))
 
-    source = np.vstack((first, second, third))
-    return np.sum(sd.face_normals * source, axis=0)
+    return np.vstack((first, second, third))
 
-def flow_scalar_source(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
-    z = sd.cell_centers[2, :]
+def flow_scalar_source(pt):
+    x, y, z = pt
 
     return 2*x**2*y**2*z**2*(1 - y)*(x - 1)**2*(z - 1)**2 + 4*x**2*y**2*z**2*(x - 1)**2*(y - 1)**2*(z - 1) + 8*x**2*y**2*z**2*(x - 1)*(y - 1)**2*(z - 1)**2 + 4*x**2*y**2*z*(x - 1)**2*(y - 1)**2*(z - 1)**2 - 2*x**2*y*z**2*(x - 1)**2*(y - 1)**2*(z - 1)**2 + 8*x*y**2*z**2*(x - 1)**2*(y - 1)**2*(z - 1)**2 - x*y*z*(x - 1)*(y - 1)*(z - 1) - x*y*z*(x - 1)*(z - 1) - x*z*(x - 1)*(y - 1)*(z - 1) - 2*y*np.pi*(y - 1)*np.sin(2*x*np.pi)*np.cos(2*z*np.pi) + 2*np.pi*np.sin(2*y*np.pi)*np.sin(2*z*np.pi)*np.cos(2*x*np.pi)
 
-def r_ex(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
-    z = sd.cell_centers[2, :]
+def r_ex(pt):
+    x, y, z = pt
 
     first = x**2*y*z*(x - 1)**2*(y - 1)*(z - 1)*(1.0*y*z*(y - 1) + 2.0*y*z*(z - 1) + 1.0*y*(y - 1)*(z - 1) + 2.0*z*(y - 1)*(z - 1))
     second = x*y**2*z*(y - 1)**2*(z - 1)*(2.0*x*z*(1 - x)*(z - 1) + 4.0*x*z*(x - 1)**2 + 4.0*x*(x - 1)**2*(z - 1) - 2.0*z*(x - 1)**2*(z - 1))
@@ -48,10 +38,8 @@ def r_ex(sd):
 
     return np.vstack((first, second, third))
 
-def u_ex(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
-    z = sd.cell_centers[2, :]
+def u_ex(pt):
+    x, y, z = pt
 
     first = 4*x**2*y**2*z**2*(1 - x)**2*(1 - y)**2*(1 - z)**2
     second = -x**2*y**2*z**2*(1 - x)**2*(1 - y)**2*(1 - z)**2
@@ -59,10 +47,8 @@ def u_ex(sd):
 
     return np.vstack((first, second, third))
 
-def q_ex(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
-    z = sd.cell_centers[2, :]
+def q_ex(pt):
+    x, y, z = pt
 
     first = np.sin(2*x*np.pi)*np.sin(2*y*np.pi)*np.sin(2*z*np.pi)
     second = x*y*z*(1 - x)*(1 - y)*(1 - z)
@@ -70,12 +56,10 @@ def q_ex(sd):
 
     return np.vstack((first, second, third))
 
-def p_ex(sd):
-    x = sd.nodes[0, :]
-    y = sd.nodes[1, :]
-    z = sd.nodes[2, :]
+def p_ex(pt):
+    x, y, z = pt
 
-    return x*y*(1 - x)*(1 - y)*z*(1-z)
+    return x*y*z*(1 - x)*(1 - y)*(1 - z)
 
 def create_grid(n):
     # make the grid
@@ -101,48 +85,44 @@ def main(n):
     mu, labda, alpha, c0 = 1, 1, 1, 1
     delta = 1
 
-    # set the bc data and source terms
-    elast_bc_val, elast_bc_ess, elast_v_source = [], [], []
-    flow_bc_val, flow_bc_ess, flow_v_source, flow_s_source = [], [], [], []
-    for sd, data in mdg.subdomains(return_data=True):
-        # boundary identifiers
-        bc_faces = np.zeros(sd.num_faces)
-        bc_ridges = np.zeros(sd.num_ridges)
+    # dscretization
+    N0 = pg.Nedelec0(elast_key)
+    RT0 = pg.RT0(flow_key)
+    P0 = pg.PwConstants(flow_key)
 
-        ess_faces = np.zeros(sd.num_faces, dtype=bool)
-        ess_ridges = np.zeros(sd.num_ridges, dtype=bool)
-        ess_cells = np.zeros(sd.num_cells, dtype=bool)
+    # set the bc data and source terms
+    elast_bc_ess, elast_v_source = [], []
+    flow_bc_ess, flow_v_source, flow_s_source = [], [], []
+    for sd, data in mdg.subdomains(return_data=True):
 
         # elasticity
         elast_param = {
             "second_order_tensor": pp.SecondOrderTensor(np.ones(sd.num_cells))
         }
 
-        elast_bc_val.append(np.hstack((bc_ridges, bc_faces)))
-        elast_bc_ess.append(np.hstack((ess_ridges, ess_faces)))
+        ess_rotation = sd.tags["domain_boundary_ridges"]
+        ess_displacement = sd.tags["domain_boundary_faces"]
+        elast_bc_ess.append(np.hstack((ess_rotation, ess_displacement)))
 
-        elast_v_source.append(elast_vector_source(sd))
+        elast_v_source.append(RT0.interpolate(sd, elast_vector_source))
 
         # flow
         flow_param = {
             "second_order_tensor": pp.SecondOrderTensor(np.ones(sd.num_cells))
         }
 
-        flow_bc_val.append(np.hstack((bc_faces, np.zeros(sd.num_cells))))
-        flow_bc_ess.append(np.hstack((ess_faces, ess_cells)))
+        ess_flux = np.zeros(sd.num_faces, dtype=bool)
+        ess_pressure = np.zeros(sd.num_cells, dtype=bool)
 
-        flow_v_source.append(flow_vector_source(sd))
-        flow_s_source.append(flow_scalar_source(sd))
+        flow_bc_ess.append(np.hstack((ess_flux, ess_pressure)))
+
+        flow_v_source.append(RT0.interpolate(sd, flow_vector_source))
+        flow_s_source.append(P0.interpolate(sd, flow_scalar_source))
 
         data[pp.PARAMETERS] = {elast_key: elast_param, flow_key: flow_param}
         data[pp.DISCRETIZATION_MATRICES] = {elast_key: {}, flow_key: {}}
 
-    bc_ess = np.hstack(elast_bc_ess + flow_bc_ess)
-
-    # dscretization
-    N0 = pg.Nedelec0(elast_key)
-    RT0 = pg.RT0(flow_key)
-    P0 = pg.PwConstants(flow_key)
+    bc_ess = np.hstack((elast_bc_ess, flow_bc_ess)).flatten()
 
     # construct the matrices
     ridge_mass = pg.ridge_mass(mdg)
@@ -172,12 +152,10 @@ def main(n):
     # assemble the right-hand side
     rhs = np.zeros(spp.shape[0])
     # data from the elastic problem
-    rhs[:dofs[1]] += np.hstack(elast_bc_val)
     rhs[dofs[0]:dofs[1]] += face_mass * np.hstack(elast_v_source)
     # data from the flow problem
-    rhs[dofs[1]:] += np.hstack(flow_bc_val)
     rhs[dofs[1]:dofs[2]] += face_mass * np.hstack(flow_v_source)
-    rhs[dofs[2]:] += np.hstack(flow_s_source)
+    rhs[dofs[2]:] += cell_mass * np.hstack(flow_s_source)
 
     # projection matrices
     ridge_proj = pg.eval_at_cell_centers(mdg, N0)
@@ -207,9 +185,16 @@ def main(n):
     # compute the error
     h, *_ = error.geometry_info(sd)
 
-    err_r = error.ridge(sd, cell_r, r_ex)
-    err_u = error.face(sd, cell_u, u_ex)
-    err_q = error.face(sd, cell_q, q_ex)
+    n0_r_ex = (ridge_proj * N0.interpolate(sd, r_ex)).reshape((3, -1), order="F")
+    err_r = error.ridge(sd, cell_r, r_hat = n0_r_ex)
+
+    rt0_u_ex = (face_proj * RT0.interpolate(sd, u_ex)).reshape((3, -1), order="F")
+    err_u = error.face(sd, cell_u, q_hat = rt0_u_ex)
+
+    rt0_q_ex = (face_proj * RT0.interpolate(sd, q_ex)).reshape((3, -1), order="F")
+    err_q = error.face(sd, cell_q, q_hat = rt0_q_ex)
+
+    #p0_p_ex = cell_proj * P0.interpolate(sd, p_ex)
     err_p = error.cell(sd, cell_p, p_ex)
 
     curl_r = pg.curl(mdg) * r
@@ -229,7 +214,7 @@ def main(n):
 
 if __name__ == "__main__":
 
-    N = np.arange(9, 14)
+    N = [3, 7, 11, 15, 19]
     err = np.array([main(n) for n in N])
 
     order_r = error.order(err[:, 1], err[:, 0])

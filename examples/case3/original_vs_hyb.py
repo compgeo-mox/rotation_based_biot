@@ -50,6 +50,8 @@ def main():
         for sd in mdg.subdomains():
             pass
 
+        print(r[i].size + u[i].size + q[i].size + p[i].size, u[i].size + p[i].size)
+
         RT0 = pg.RT0(keyword)
         BDM1 = pg.BDM1(keyword)
         P0 = pg.PwConstants(keyword)
