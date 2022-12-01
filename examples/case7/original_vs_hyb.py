@@ -69,7 +69,7 @@ def create_grid(n):
 def main():
 
     keyword="flow"
-    N = [3, 7, 11, 15, 19] #np.arange(9, 14)
+    N = [3, 7, 11, 15, 19, 23]
 
     curl_r, div_u, div_q, r, u, q, p = load(N, "../case7/")
     curl_hat_r, div_hat_u, div_hat_q, hat_r, hat_u, hat_q, hat_p = load(N, "../case8/")

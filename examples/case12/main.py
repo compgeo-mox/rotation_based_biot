@@ -162,11 +162,11 @@ def main(n, mu, labda, k, alpha, c0, delta):
 
 if __name__ == "__main__":
 
-    n_val =  [3, 7, 11, 15, 19]
+    n_val =  [19, 23] #[7, 11, 15]# , 19, 23]
     mu_val = np.array([1e-4, 1, 1e4])
     labda_val = np.array([1e-4, 1, 1e4])
     k_val = np.array([1e-4, 1, 1e4])
-    alpha_val = np.array([0, 1])
+    alpha_val = np.array([1])
     c0_val = np.array([0, 10, 100])
     delta_val = np.array([1e-4, 1e-2, 1])
 
@@ -180,4 +180,4 @@ if __name__ == "__main__":
                           for c0 in c0_val \
                           for delta in delta_val])
 
-    np.savetxt("iterations.txt", results)
+    np.savetxt("iterations1.txt", results)
