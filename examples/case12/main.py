@@ -1,4 +1,6 @@
 import numpy as np
+import json
+import sys
 import scipy.sparse as sps
 import porepy as pp
 import pygeon as pg
@@ -162,22 +164,18 @@ def main(n, mu, labda, k, alpha, c0, delta):
 
 if __name__ == "__main__":
 
-    n_val =  [19, 23] #[7, 11, 15]# , 19, 23]
-    mu_val = np.array([1e-4, 1, 1e4])
-    labda_val = np.array([1e-4, 1, 1e4])
-    k_val = np.array([1e-4, 1, 1e4])
-    alpha_val = np.array([1])
-    c0_val = np.array([0, 10, 100])
-    delta_val = np.array([1e-4, 1e-2, 1])
+    with open(sys.argv[1]) as user_file:
+        data = json.load(user_file)
 
     results = np.array([(n, mu, labda, k, alpha, c0, delta,
                          main(n, mu, labda, k, alpha, c0, delta))
-                          for n in n_val \
-                          for mu in mu_val \
-                          for labda in labda_val \
-                          for k in k_val \
-                          for alpha in alpha_val \
-                          for c0 in c0_val \
-                          for delta in delta_val])
+                          for n in data["n_val"] \
+                          for mu in data["mu_val"] \
+                          for labda in data["labda_val"] \
+                          for k in data["k_val"] \
+                          for alpha in data["alpha_val"] \
+                          for c0 in data["c0_val"] \
+                          for delta in data["delta_val"]
+                        ])
 
-    np.savetxt("iterations1.txt", results)
+    np.savetxt(sys.argv[2], results)
