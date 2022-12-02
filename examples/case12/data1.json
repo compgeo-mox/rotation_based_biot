@@ -1,6 +1,6 @@
 {
-    "n_val":  [19, 23],
-    "mu_val": [1e-4, 1, 1e4],
+    "n_val":  [19],
+    "mu_val": [1e-4],
     "labda_val": [1e-4, 1, 1e4],
     "k_val": [1e-4, 1, 1e4],
     "alpha_val": [1],
