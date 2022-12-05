@@ -7,9 +7,8 @@ import sys
 
 sys.path.append("../../src/")
 
-from mandel import compute_true_solutions
+from mandel import compute_true_solutions, compute_initial_true_solutions, scale_time
 from create_grid import create_grid
-
 
 def main(n):
 
@@ -29,11 +28,15 @@ def main(n):
     F = 6e8
 
     delta = np.sqrt(1e1)
-    num_time_steps = 100
+    num_time_steps = 100*50
 
-    n_alpha = 100
+    n_alpha = 200
     p_true, u_true = compute_true_solutions(
         [labda, mu, c0, alpha, perm], [F, a, b], n_alpha
+    )
+
+    p_0, u_0 = compute_initial_true_solutions(
+        [labda, mu, c0, alpha, perm], [F, a, b]
     )
 
     # dscretization
@@ -86,8 +89,8 @@ def main(n):
     # assemble the saddle point problem
     spp = sps.bmat(
         [
-            [2 / mu * ridge_mass, -curl.T, None, None],
-            [curl, (labda + mu) * div_div, None, -alpha * div.T],
+            [1 / mu * ridge_mass, -curl.T, None, None],
+            [curl, (labda + 2*mu) * div_div, None, -alpha * div.T],
             [None, None, face_perm_mass, -delta * div.T],
             [None, alpha * div, delta * div, c0 * cell_mass],
         ],
@@ -99,8 +102,8 @@ def main(n):
     face_proj = pg.eval_at_cell_centers(mdg, RT0)
     cell_proj = pg.eval_at_cell_centers(mdg, P0)
 
-    u = RT0.interpolate(sd, lambda x: u_true(x, 0))
-    p = P0.interpolate(sd, lambda x: p_true([0, 0, 0], 0))
+    u = RT0.interpolate(sd, u_0)
+    p = P0.interpolate(sd, p_0)
 
     rhs = np.zeros(spp.shape[0])
     bc_val = np.zeros(spp.shape[0])
@@ -113,10 +116,10 @@ def main(n):
         for sd, data in mdg.subdomains(return_data=True):
             data[pp.STATE] = {
                 "r": ridge_proj * r,
-                "p": cell_proj * p,
-                "p_ex": cell_proj * p_ex,
-                "u": (face_proj * u).reshape((3, -1), order="F"),
-                "u_ex": (face_proj * u_ex).reshape((3, -1), order="F"),
+                "p": cell_proj * p * a / F,
+                "p_ex": cell_proj * p_ex * a / F,
+                "u": (face_proj * u).reshape((3, -1), order="F") / a,
+                "u_ex": (face_proj * u_ex).reshape((3, -1), order="F") / a,
                 "q": (face_proj * q).reshape((3, -1), order="F"),
             }
         exporter.write_vtu([*data[pp.STATE].keys()], time_step=t_step)
@@ -147,7 +150,9 @@ def main(n):
 
         export_sol(r, u, q, p, u_at_time, p_at_time, t_step)
 
-    exporter.write_pvd(np.arange(num_time_steps) * delta**2)
+    time = np.arange(num_time_steps) * delta**2
+    time_scaled = scale_time(time, [labda, mu, c0, alpha, perm], [F, a, b])
+    exporter.write_pvd(time_scaled)
 
 
 if __name__ == "__main__":
