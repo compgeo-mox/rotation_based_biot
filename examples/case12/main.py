@@ -145,7 +145,9 @@ def main(n, mu, labda, k, alpha, c0, delta):
     ls_precond = pg.LinearSystem(precond)
     ls_precond.flag_ess_bc(bc_ess, np.zeros(bc_ess.size))
     precond_0, _, _ = ls_precond.reduce_system()
-    apply_precond = lambda x: sps.linalg.spsolve(precond_0, x)
+
+    lu_precond_0 = sps.linalg.splu(precond_0)
+    apply_precond = lambda x: lu_precond_0.solve(x)
     M = sps.linalg.LinearOperator(precond_0.shape, matvec=apply_precond)
 
     counter = minres_counter()
