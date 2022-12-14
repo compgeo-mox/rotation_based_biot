@@ -53,7 +53,7 @@ def face_v1(sd, q, q_ex=None, q_hat=None):
 
 def cell(sd, p, p_ex=None, p_hat=None):
     if p_ex is not None:
-        p_eval = p_ex(sd.nodes)
+        p_eval = np.array([p_ex(x) for x in sd.nodes.T])
     if p_hat is not None:
         p_eval = p_hat
 

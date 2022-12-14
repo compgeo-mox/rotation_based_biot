@@ -10,10 +10,20 @@ def eformat(f, prec, exp_digits):
     mantissa, exp = s.split('e')
     return "%se%+0*d"%(mantissa, exp_digits+1, int(exp))
 
-def print_error(vals):
+def print_error(name, vals):
+    print(name)
     [print(eformat(v, 2, 1) + " & ") for v in vals]
 
-def print_order(vals):
+def print_order(name, vals):
+    print(name)
+    [print("{:0.2f}".format(v) + " & ") for v in vals]
+
+def print_error(name, vals):
+    print(name)
+    [print(eformat(v, 2, 1) + " & ") for v in vals]
+
+def print_order(name, vals):
+    print(name)
     [print("{:0.2f}".format(v) + " & ") for v in vals]
 
 def curl_r_ex(pt):
@@ -131,13 +141,11 @@ def main():
         err_ex_curl_r.append(error.face_v1(sd, curl_r[i], q_hat = rt0_curl_r_ex))
         err_ex_curl_hat_r.append(error.face_v1(sd, curl_hat_r[i], q_hat = rt0_curl_r_ex))
 
-        p0_div_u_ex = P0.interpolate(sd, div_u_ex)
-        err_ex_div_u.append(error.cell_center(sd, div_u[i], p_hat = p0_div_u_ex))
-        err_ex_div_hat_u.append(error.cell_center(sd, div_hat_u[i], p_hat = p0_div_u_ex))
+        err_ex_div_u.append(error.cell(sd, cell_div_u, div_u_ex))
+        err_ex_div_hat_u.append(error.cell(sd, cell_div_hat_u, div_u_ex))
 
-        p0_div_q_ex = P0.interpolate(sd, div_q_ex)
-        err_ex_div_q.append(error.cell_center(sd, div_q[i], p_hat = p0_div_q_ex))
-        err_ex_div_hat_q.append(error.cell_center(sd, div_hat_q[i], p_hat = p0_div_q_ex))
+        err_ex_div_q.append(error.cell(sd, cell_div_q, div_q_ex))
+        err_ex_div_hat_q.append(error.cell(sd, cell_div_hat_q, div_q_ex))
 
     order_r = error.order(err_r, h)
     order_u = error.order(err_u, h)

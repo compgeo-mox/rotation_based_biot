@@ -48,7 +48,7 @@ def create_grid(n):
 def main():
 
     keyword="flow"
-    N = [3, 7, 11, 15, 19, 23]
+    N = [7, 11, 15, 19, 23]
 
     curl_r, div_u, r, u = load(N, "../case5/")
     curl_hat_r, div_hat_u, hat_r, hat_u = load(N, "../case6/")
@@ -98,9 +98,8 @@ def main():
         err_ex_curl_r.append(error.face_v1(sd, curl_r[i], q_hat = rt0_curl_r_ex))
         err_ex_curl_hat_r.append(error.face_v1(sd, curl_hat_r[i], q_hat = rt0_curl_r_ex))
 
-        p0_div_u_ex = P0.interpolate(sd, div_u_ex)
-        err_ex_div_u.append(error.cell_center(sd, div_u[i], p_hat = p0_div_u_ex))
-        err_ex_div_hat_u.append(error.cell_center(sd, div_hat_u[i], p_hat = p0_div_u_ex))
+        err_ex_div_u.append(error.cell(sd, cell_div_u, div_u_ex))
+        err_ex_div_hat_u.append(error.cell(sd, cell_div_hat_u, div_u_ex))
 
     order_r = error.order(err_r, h)
     order_u = error.order(err_u, h)

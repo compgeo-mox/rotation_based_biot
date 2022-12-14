@@ -75,6 +75,16 @@ def two_dim(R):
     w = flow_scalar_source(u, q, p, R)
     print("flow scalar source\n", to_numpy_scalar(w, R))
 
+    curl_r = curl(r, R).simplify()
+    print("curl_r\n", to_numpy_vector(curl_r, R, 0))
+    print("curl_r\n", to_numpy_vector(curl_r, R, 1))
+    print("curl_r\n", to_numpy_vector(curl_r, R, 2))
+
+    div_u = divergence(u, R).simplify()
+    print("div_u\n", to_numpy_scalar(div_u, R))
+
+    div_q = divergence(q, R).simplify()
+    print("div_q\n", to_numpy_scalar(div_q, R))
 
 ## -------------------------------------------------------------------##
 
