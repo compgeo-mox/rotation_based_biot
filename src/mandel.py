@@ -39,10 +39,14 @@ def convert_parameters(param):
     B = alpha / (c_0 * K_u)
 
     nu_u_factor = (alpha * B * (1 - 2 * nu)) / 3
-    nu_u = (nu_u_factor + nu) / (1 - 2 * nu_u_factor)
+    #nu_u = (nu_u_factor + nu) / (1 - 2 * nu_u_factor)
+    nu_u = (3 * nu + B * (1 - 2 * nu)) / (3 - B * (1 - 2 * nu))
 
     alpha_factor = (1 - nu) / (nu_u - nu)
-    c_f = perm / c_0 * (K + 4.0 / 3.0 * mu) / (K_u + 4.0 / 3.0 * mu)
+    #c_f = perm / c_0 * (K + 4.0 / 3.0 * mu) / (K_u + 4.0 / 3.0 * mu)
+    c_f = (2 * perm * (B**2) * mu * (1 - nu) * (1 + nu_u) ** 2) / (
+        9 * (1 - nu_u) * (nu_u - nu)
+    )
 
     return B, nu, nu_u, c_f, alpha_factor
 
@@ -87,12 +91,35 @@ def true_solution(old_param, bc_param, converted_param, alpha_n):
 
     return p, u
 
+def initial_solution(old_param, bc_param, converted_param):
+    mu = old_param[1]
+    F, a, _ = bc_param
+    B, nu, nu_u, c_f, alpha_factor = converted_param
+
+    def p(x):
+        return (F * B * (1 + nu_u)) / (3 * a)
+
+    def u(x):
+        ux = ((F * nu_u) / (2 * mu * a)) * x[0]
+        uy = ((-F * (1 - nu_u)) / (2 * mu * a)) * x[1]
+        return np.array([ux, uy, 0])
+
+    return p, u
+
+def scale_time(t, param, bc_param):
+    converted_param = convert_parameters(param)
+    c_f = converted_param[-2]
+    a = bc_param[1]
+    return (t * c_f) / a**2
 
 def compute_true_solutions(param, bc_param, n_alpha=10):
     converted_param = convert_parameters(param)
     alpha_n = compute_alpha(converted_param[-1], n_alpha)
     return true_solution(param, bc_param, converted_param, alpha_n)
 
+def compute_initial_true_solutions(param, bc_param):
+    converted_param = convert_parameters(param)
+    return initial_solution(param, bc_param, converted_param)
 
 if __name__ == "__main__":
 
