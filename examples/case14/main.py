@@ -43,23 +43,26 @@ def main(n):
     L1 = pg.Lagrange1(elast_key)
     RT0 = pg.RT0(elast_key)
     P0 = pg.PwConstants(flow_key)
+    BDM1 = pg.BDM1(flow_key)
 
     # set the bc data and source terms
-    elast_bc_ess, flow_bc_ess = [], []
+    ess_displacement, ess_pressure = [], []
+    ess_rotation, ess_flux = [], []
     for sd, data in mdg.subdomains(return_data=True):
-        ess_rotation = sd.tags["domain_boundary_ridges"]
-        ess_displacement = sd.tags["domain_boundary_faces"]
-        elast_bc_ess.append(np.hstack((ess_rotation, ess_displacement)))
+        ess_displacement.append(sd.tags["domain_boundary_faces"])
+        ess_rotation.append(sd.tags["domain_boundary_ridges"])
 
         # elasticity
         elast_param = {
             "second_order_tensor": pp.SecondOrderTensor(np.ones(sd.num_cells))
         }
 
-        ess_flux = sd.tags["domain_boundary_faces"]
-        ess_flux[np.isclose(sd.face_centers[0, :], a)] = False
-        ess_pressure = np.zeros(sd.num_cells, dtype=bool)
-        flow_bc_ess.append(np.hstack((ess_flux, ess_pressure)))
+        ess_pressure.append(np.zeros(sd.num_cells, dtype=bool))
+
+        bc_flux = sd.tags["domain_boundary_faces"].copy()
+        bc_flux[np.isclose(sd.face_centers[0, :], a)] = False
+        ess_flux.append(bc_flux)
+        ess_flux.append(bc_flux)
 
         # flow
         flow_param = {
@@ -69,36 +72,52 @@ def main(n):
         data[pp.PARAMETERS] = {elast_key: elast_param, flow_key: flow_param}
         data[pp.DISCRETIZATION_MATRICES] = {elast_key: {}, flow_key: {}}
 
-    bc_ess = np.hstack(elast_bc_ess + flow_bc_ess).flatten()
+    ess_rotation = np.hstack(ess_rotation)
+    ess_flux = np.hstack(ess_flux)
+    ess_displacement = np.hstack(ess_displacement)
+    ess_pressure = np.hstack(ess_pressure)
+
+    bc_ess = np.hstack((ess_displacement, ess_pressure))
 
     # construct the matrices
-    ridge_mass = pg.ridge_mass(mdg)
+    lumped_ridge_mass = pg.numerics.innerproducts.lumped_mass_matrix(mdg, 2, None)
     cell_mass = pg.cell_mass(mdg)
     face_mass = pg.face_mass(mdg, keyword=elast_key)
-    face_perm_mass = pg.face_mass(mdg, keyword=flow_key)
+
+    lumped_face_perm_mass = 1/perm * BDM1.assemble_lumped_matrix(sd, None)
+    div_bdm1 = cell_mass * BDM1.assemble_diff_matrix(sd)
 
     curl = face_mass * pg.curl(mdg)
     div = cell_mass * pg.div(mdg)
     div_div = pg.div(mdg).T * cell_mass * pg.div(mdg)
 
+    # assemble the Schur complement for the elastic problem
+    ls = pg.LinearSystem(1/mu*lumped_ridge_mass, curl.T.tocsc())
+    ls.flag_ess_bc(ess_rotation, np.zeros_like(ess_rotation))
+    elast_sc = ls.solve()
+
+    # assemble the reduced matrix for the elastic problem
+    elast_mat = curl * elast_sc + (labda+2*mu)*div_div
+
+    # assemble the Schur complement for the flow problem
+    ls = pg.LinearSystem(lumped_face_perm_mass, delta * div_bdm1.T.tocsc())
+    ls.flag_ess_bc(ess_flux, np.zeros_like(ess_flux))
+    flow_sc = ls.solve()
+
+    # assemble the reduced matrix for the flow problem
+    flow_mat = delta * div_bdm1 * flow_sc + c0 * cell_mass
+
     # get the degrees of freedom for each variable
-    _, ridge_dof = curl.shape
     cell_dof, face_dof = div.shape
-    dofs = np.cumsum([ridge_dof, face_dof, face_dof])
+    dofs = np.cumsum([face_dof])
 
     # assemble the saddle point problem
-    spp = sps.bmat(
-        [
-            [1 / mu * ridge_mass, -curl.T, None, None],
-            [curl, (labda + 2*mu) * div_div, None, -alpha * div.T],
-            [None, None, face_perm_mass, -delta * div.T],
-            [None, alpha * div, delta * div, c0 * cell_mass],
-        ],
-        format="csc",
-    )
+    spp = sps.bmat([
+        [elast_mat, -alpha*div.T],
+        [alpha*div,     flow_mat]
+        ], format="csc")
 
     # projection matrices
-    ridge_proj = pg.eval_at_cell_centers(mdg, L1)
     face_proj = pg.eval_at_cell_centers(mdg, RT0)
     cell_proj = pg.eval_at_cell_centers(mdg, P0)
 
@@ -112,19 +131,17 @@ def main(n):
         mdg, "sol", folder_name="sol", export_constants_separately=False
     )
 
-    def export_sol(r, u, q, p, u_ex, p_ex, t_step):
+    def export_sol(u, p, u_ex, p_ex, t_step):
         for sd, data in mdg.subdomains(return_data=True):
             data[pp.STATE] = {
-                "r": ridge_proj * r,
                 "p": cell_proj * p * a / F,
                 "p_ex": cell_proj * p_ex * a / F,
                 "u": (face_proj * u).reshape((3, -1), order="F") / a,
                 "u_ex": (face_proj * u_ex).reshape((3, -1), order="F") / a,
-                "q": (face_proj * q).reshape((3, -1), order="F"),
             }
         exporter.write_vtu([*data[pp.STATE].keys()], time_step=t_step)
 
-    export_sol(np.zeros(sd.num_ridges), u, np.zeros(sd.num_faces), p, u, p, 0)
+    export_sol(u, p, u, p, 0)
 
     for t_step in np.arange(1, num_time_steps):
         time = t_step * (delta**2)
@@ -135,7 +152,7 @@ def main(n):
 
         # set the boundary condition
         u_bc = RT0.interpolate(sd, lambda x: u_true(x, time))
-        bc_val[dofs[0] : dofs[1]] = u_bc
+        bc_val[:dofs[0]] = u_bc
 
         # create the linear system
         ls = pg.LinearSystem(spp, rhs)
@@ -143,13 +160,12 @@ def main(n):
         x = ls.solve()
 
         # extract the variables
-        r, u, q, p = np.split(x, dofs)
+        u, p = np.split(x, dofs)
 
-        import pdb; pdb.set_trace()
         u_at_time = RT0.interpolate(sd, lambda x: u_true(x, time))
         p_at_time = P0.interpolate(sd, lambda x: p_true(x, time))
 
-        export_sol(r, u, q, p, u_at_time, p_at_time, t_step)
+        export_sol(u, p, u_at_time, p_at_time, t_step)
 
     time = np.arange(num_time_steps) * delta**2
     time_scaled = scale_time(time, [labda, mu, c0, alpha, perm], [F, a, b])

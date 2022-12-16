@@ -10,3 +10,5 @@ case9: preconditioner 2d elasticity - OK
 case10: preconditioner 3d elasticity - OK
 case11: preconditioner 2d biot - OK
 case12: preconditioner 3d biot - TODO
+case13: mandel
+case14: mandel hyb
