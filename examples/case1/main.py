@@ -16,18 +16,17 @@ def vector_source(sd):
     source = np.vstack((first, second, np.zeros(sd.num_faces)))
     return np.sum(sd.face_normals * source, axis=0)
 
-def r_ex(sd):
-    x = sd.nodes[0, :]
-    y = sd.nodes[1, :]
+def r_ex(pt):
+    x, y, z = pt
+
     return x*y*(1.0*x*y*(1 - x)*(y - 1)**2 + 4.0*x*y*(1 - y)*(x - 1)**2 - 4.0*x*(x - 1)**2*(y - 1)**2 - 1.0*y*(x - 1)**2*(y - 1)**2)
 
-def u_ex(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
+def u_ex(pt):
+    x, y, z = pt
 
     first = 4*x**2*y**2*(1 - x)**2*(1 - y)**2
     second = -x**2*y**2*(1 - x)**2*(1 - y)**2
-    return np.vstack((first, second, np.zeros(sd.num_cells)))
+    return np.vstack((first, second, 0))
 
 def create_grid(n):
     # make the grid
@@ -116,8 +115,8 @@ def main(n, keyword="flow"):
     # compute the error
     h, *_ = error.geometry_info(sd)
 
-    err_r = error.ridge(sd, r, r_ex)
-    err_u = error.face(sd, cell_u, u_ex)
+    err_r = L1.error_l2(sd, r, r_ex)
+    err_u = RT0.error_l2(sd, u, u_ex)
 
     curl_r = pg.curl(mdg) * r
     div_u = pg.div(mdg) * u

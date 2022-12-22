@@ -32,27 +32,27 @@ def flow_scalar_source(sd):
     return 2*x**2*y**2*(1 - y)*(x - 1)**2 + 8*x**2*y**2*(x - 1)*(y - 1)**2 - 2*x**2*y*(x - 1)**2*(y - 1)**2 + 8*x*y**2*(x - 1)**2*(y - 1)**2 + x*y*(x - 1)*(y - 1) + x*y*(x - 1) + x*(x - 1)*(y - 1) + 2*np.pi*np.sin(2*y*np.pi)*np.cos(2*x*np.pi)
 
 def r_ex(sd):
-    x = sd.nodes[0, :]
-    y = sd.nodes[1, :]
+    x, y, z = pt
+
     return x*y*(1.0*x*y*(1 - x)*(y - 1)**2 + 4.0*x*y*(1 - y)*(x - 1)**2 - 4.0*x*(x - 1)**2*(y - 1)**2 - 1.0*y*(x - 1)**2*(y - 1)**2)
 
 def u_ex(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
+    x, y, z = pt
+
     first = 4*x**2*y**2*(1 - x)**2*(1 - y)**2
     second = -x**2*y**2*(1 - x)**2*(1 - y)**2
     return np.vstack((first, second, np.zeros(sd.num_cells)))
 
 def q_ex(sd):
-    x = sd.cell_centers[0, :]
-    y = sd.cell_centers[1, :]
+    x, y, z = pt
+
     first = np.sin(2*x*np.pi)*np.sin(2*y*np.pi)
     second = x*y*(1 - x)*(1 - y)
     return np.vstack((first, second, np.zeros(sd.num_cells)))
 
 def p_ex(sd):
-    x = sd.nodes[0, :]
-    y = sd.nodes[1, :]
+    x, y, z = pt
+
     return x*y*(1 - x)*(1 - y)
 
 def create_grid(n):
@@ -183,10 +183,10 @@ def main(n):
     # compute the error
     h, *_ = error.geometry_info(sd)
 
-    err_r = error.ridge(sd, r, r_ex)
-    err_u = error.face(sd, cell_u, u_ex)
-    err_q = error.face(sd, cell_q, q_ex)
-    err_p = error.cell(sd, cell_p, p_ex)
+    err_r = L1.error_l2(sd, r, r_ex)
+    err_u = RT0.error_l2(sd, cell_u, u_ex)
+    err_q = error_l2(sd, cell_q, q_ex)
+    err_p = error_l2(sd, cell_p, p_ex)
 
     curl_r = pg.curl(mdg) * r
     div_u = pg.div(mdg) * u
@@ -205,7 +205,7 @@ def main(n):
 
 if __name__ == "__main__":
 
-    N = 2 ** np.arange(4, 9)
+    N = 2 ** np.arange(4, 7)
 
     err = np.array([main(n) for n in N])
 
